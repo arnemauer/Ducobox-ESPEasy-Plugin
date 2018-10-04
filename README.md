@@ -27,18 +27,16 @@ Delen vn de code zijn gebaseerd op de library gemaakt door 'supersjimmie', 'Thin
 
 **1. Veranderd ventilatiemode commando**: VENT,mode,override 
 
-	**mode**
-	- AUTO
-	- LOW
-	- MIDDLE
-	- HIGH
-	- NOTHOME
+**mode**
+- AUTO
+- LOW
+- MIDDLE
+- HIGH
+- NOTHOME
 
-	**override**
-	- percentage 0 - 100%
-
-	LET OP: dit percentage wordt overgenomen ongeacht de ventilatiemodus.
-
+**override**
+- percentage 0 - 100%
+LET OP: dit percentage wordt overgenomen ongeacht de ventilatiemodus.
 
 **2. Join commando**: JOIN
 
