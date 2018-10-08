@@ -20,25 +20,23 @@ Benodigde hardware:
 |8 - CSN      |15=D8   |Chip select / (SPI_SS)                             |
 
 
-Delen vn de code zijn gebaseerd op de library gemaakt door 'supersjimmie', 'Thinkpad', 'Klusjesman' and 'jodur'. https://github.com/supersjimmie/IthoEcoFanRFT/tree/master/Master/Itho 
+Delen van de code zijn gebaseerd op de library gemaakt door 'supersjimmie', 'Thinkpad', 'Klusjesman' and 'jodur'. https://github.com/supersjimmie/IthoEcoFanRFT/tree/master/Master/Itho 
 
  
 ## Commando's:
 
-**1. Veranderd ventilatiemode commando**: VENT,mode,override 
+**1. Verander ventilatiemode commando**: VENT,mode,override 
 
-	**mode**
-	- AUTO
-	- LOW
-	- MIDDLE
-	- HIGH
-	- NOTHOME
+**mode**
+- AUTO
+- LOW
+- MIDDLE
+- HIGH
+- NOTHOME
 
-	**override**
-	- percentage 0 - 100%
-
-	LET OP: dit percentage wordt overgenomen ongeacht de ventilatiemodus.
-
+**override**
+- percentage 0 - 100%
+LET OP: dit percentage wordt overgenomen ongeacht de ventilatiemodus.
 
 **2. Join commando**: JOIN
 
