@@ -47,3 +47,12 @@ LET OP: dit percentage wordt overgenomen ongeacht de ventilatiemodus.
 
 Om de ventilator aan te sturen moet je deze aanmelden bij de Ducobox. Zet de Ducobox daarvoor in de "installermode" via de drukknop op de printplaat van de Ducobox of via een van de componenten.
 Start daarna het join commando. Na enkele seconden is het netwerkid en deviceid ingesteld.
+
+### Screenshots ESP8266 als CO2 sensor ###
+![alt text](https://github.com/arnemauer/Ducobox-ESPEasy-Plugin/raw/master/Screenshots%20Duco%20Network%20Tool/CO2sensorpage.png)
+
+
+![alt text](https://github.com/arnemauer/Ducobox-ESPEasy-Plugin/raw/master/Screenshots%20Duco%20Network%20Tool/devicetable.png)
+
+
+![alt text](https://github.com/arnemauer/Ducobox-ESPEasy-Plugin/raw/master/Screenshots%20Duco%20Network%20Tool/network.png)
