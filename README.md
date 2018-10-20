@@ -25,7 +25,7 @@ Delen van de code zijn gebaseerd op de library gemaakt door 'supersjimmie', 'Thi
  
 ## Commando's:
 
-**1. Verander ventilatiemode commando**: VENT,mode,override 
+**1. Verander ventilatiemode commando**: VENTMODE,<mode>,<override>
 
 **mode**
 - AUTO
