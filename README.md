@@ -32,10 +32,13 @@ Delen van de code zijn gebaseerd op de library gemaakt door '[supersjimmie](http
 
 Bij de serial gateway worden de volgende gegevens uitgelezen:
 
-* FLOW_PERCENTAGE: snelheid van de ventilator 0 - 100%
-* DUCO_STATUS: status (zie tabel)
-* CO2_PPM: CO2 PPM waarde van bediening met CO2 sensor
-* CO2_TEMP: Temperatuur van bediening met CO2 sensor
+
+|variabele    |Uitleg|
+|:---------------|:--------------------------------------------------|
+|FLOW_PERCENTAGE |Snelheid van de ventilator 0 - 100%                |
+|DUCO_STATUS     |Ventilatiemodus                                    |
+|CO2_PPM         |CO2 PPM waarde van bediening met CO2 sensor        |  
+|CO2_TEMP        |Temperatuur van bediening met CO2 sensor           |
 
 Meer informatie over welke data wordt uitgelezen [vind je hier](https://github.com/arnemauer/Ducobox-ESPEasy-Plugin/wiki/Data-uit-Ducobox).
     
@@ -45,6 +48,6 @@ Meer informatie over de commando's [vind je hier](https://github.com/arnemauer/D
 ).
 
 
-### Screenshots ESP8266 als CO2 sensor in DUCO Network Tool ###
+## Screenshots ESP8266 als CO2 sensor in DUCO Network Tool ###
 De Duco Network Tool is een programma waarmee je via een computer de ducobox kan uitlezen en configureren. 
 Op deze [wikipagina](https://github.com/arnemauer/Ducobox-ESPEasy-Plugin/wiki/DUCO-Network-tool) vind je screenshots waarop je kan zien hoe de unit zich als CO2 sensor aanmeld bij de ducobox.
