@@ -1,7 +1,7 @@
 # Ducobox ESPEasy Plugin
 Plugin voor ESPEasy om een Ducobox Silent / Focus aan te sturen / sensoren uit te lezen. 
 
-Delen van de code zijn gebaseerd op de library gemaakt door 'supersjimmie', 'Thinkpad', 'Klusjesman' and 'jodur'. https://github.com/supersjimmie/IthoEcoFanRFT/tree/master/Master/Itho 
+Delen van de code zijn gebaseerd op de library gemaakt door '[supersjimmie](https://github.com/supersjimmie/IthoEcoFanRFT/tree/master/Master/Itho )', 'Thinkpad', 'Klusjesman' and 'jodur'. 
 
 ## Benodigde hardware:
 - WEMOS D1 of een ander ESP8266 variant
