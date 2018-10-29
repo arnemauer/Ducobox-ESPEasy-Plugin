@@ -211,15 +211,17 @@ void CC1101::sendData(CC1101Packet *packet)
 	length = (packet->length <= CC1101_DATA_LEN ? packet->length : CC1101_DATA_LEN);
 	packet->data[0] = (packet->length -1 );
 
+	// Debug 
+	/*
 	Serial.print("DUCO: sending message: ");
 	for(int i=0;i<= (packet->length-1);i++){
 		Serial.print(packet->data[i], HEX);
 		Serial.print(", ");
-
 	}	
 		//Serial.print(packet->data[i], HEX);
 	Serial.println(" - end");
-
+	// Debug 
+*/
 
 	writeBurstRegister(CC1101_TXFIFO, packet->data, length);
 
@@ -264,7 +266,8 @@ void CC1101::sendData(CC1101Packet *packet)
 		if (MarcState == CC1101_MARCSTATE_TXFIFO_UNDERFLOW) Serial.print(F("TXFIFO_UNDERFLOW occured in sendData() \n"));
 	}
   	while ((readRegisterWithSyncProblem(CC1101_MARCSTATE, CC1101_STATUS_REGISTER)) != CC1101_MARCSTATE_RX);
-	  	Serial.println("DUCO: message sent!");
+	  
+//	  	Serial.println("DUCO: message sent!");
 
 //delay(1);
 //ESP.wdtEnable(1);
