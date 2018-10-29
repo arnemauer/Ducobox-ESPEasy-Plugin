@@ -32,8 +32,7 @@ Delen van de code zijn gebaseerd op de library gemaakt door '[supersjimmie](http
 
 Bij de serial gateway worden de volgende gegevens uitgelezen:
 
-
-|variabele    |Uitleg|
+|Variabele       |Uitleg|
 |:---------------|:--------------------------------------------------|
 |FLOW_PERCENTAGE |Snelheid van de ventilator 0 - 100%                |
 |DUCO_STATUS     |Ventilatiemodus                                    |
