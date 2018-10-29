@@ -29,10 +29,10 @@ Delen van de code zijn gebaseerd op de library gemaakt door '[supersjimmie](http
  
  ## Data
 
-FLOW_PERCENTAGE: snelheid van de ventilator 0 - 100%
-DUCO_STATUS: status (zie tabel)
-CO2_PPM: CO2 PPM waarde van bediening met CO2 sensor
-CO2_TEMP: Temperatuur van bediening met CO2 sensor
+* FLOW_PERCENTAGE: snelheid van de ventilator 0 - 100%
+* DUCO_STATUS: status (zie tabel)
+* CO2_PPM: CO2 PPM waarde van bediening met CO2 sensor
+* CO2_TEMP: Temperatuur van bediening met CO2 sensor
 
 |Statusnummer  |Mode|Uitleg                          |
 |:-------------|:-------|:---------------------------|
