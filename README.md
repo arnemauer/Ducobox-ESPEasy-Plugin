@@ -28,24 +28,16 @@ Delen van de code zijn gebaseerd op de library gemaakt door '[supersjimmie](http
 
 <img src="https://github.com/arnemauer/Ducobox-ESPEasy-Plugin/raw/master/Screenshots%20Duco%20Network%20Tool/HARDWARE.jpg" width="500">  
 
- 
  ## Data
+
+Bij de serial gateway worden de volgende gegevens uitgelezen:
 
 * FLOW_PERCENTAGE: snelheid van de ventilator 0 - 100%
 * DUCO_STATUS: status (zie tabel)
 * CO2_PPM: CO2 PPM waarde van bediening met CO2 sensor
 * CO2_TEMP: Temperatuur van bediening met CO2 sensor
 
-|Statusnummer  |Mode|Uitleg                          |
-|:-------------|:-------|:---------------------------|
-|0             |auto    |Automatic Mode              |
-|1             |man1    |Manual mode 1 (low)         |
-|2             |man2    |Manual mode 2 (middle)      |
-|3             |man3    |Manual mode 3 (high)        |  
-|4             |empt    |Empty House (low)           |
-
-<img src="https://github.com/arnemauer/Ducobox-ESPEasy-Plugin/raw/master/Screenshots%20Duco%20Network%20Tool/ESPEASY-DUCOPLUGIN-DEVICEPAGE.png" width="500">     <img src="https://github.com/arnemauer/Ducobox-ESPEasy-Plugin/raw/master/Screenshots%20Duco%20Network%20Tool/ESPEASY-DUCOPLUGIN-RFGW-TASK-SETTINGS.png" width="280">
-
+Meer informatie over welke data wordt uitgelezen [vind je hier](https://github.com/arnemauer/Ducobox-ESPEasy-Plugin/wiki/Data-uit-Ducobox).
     
 ## Commando's en aan/afmelden van de unit:
 
@@ -54,12 +46,5 @@ Meer informatie over de commando's [vind je hier](https://github.com/arnemauer/D
 
 
 ### Screenshots ESP8266 als CO2 sensor in DUCO Network Tool ###
-De Duco Network Tool is een programma waarmee je via een computer de ducobox kan uitlezen en configureren. In de onderstaande screenshots zie je hoe de unit zich als CO2 sensor aanmeld bij de ducobox.
-
-![alt text](https://github.com/arnemauer/Ducobox-ESPEasy-Plugin/raw/master/Screenshots%20Duco%20Network%20Tool/CO2sensorpage.png)
-
-
-![alt text](https://github.com/arnemauer/Ducobox-ESPEasy-Plugin/raw/master/Screenshots%20Duco%20Network%20Tool/devicetable.png)
-
-
-![alt text](https://github.com/arnemauer/Ducobox-ESPEasy-Plugin/raw/master/Screenshots%20Duco%20Network%20Tool/network.png)
+De Duco Network Tool is een programma waarmee je via een computer de ducobox kan uitlezen en configureren. 
+Op deze [wikipagina](https://github.com/arnemauer/Ducobox-ESPEasy-Plugin/wiki/DUCO-Network-tool) vind je screenshots waarop je kan zien hoe de unit zich als CO2 sensor aanmeld bij de ducobox.
