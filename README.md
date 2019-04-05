@@ -24,9 +24,7 @@ Delen van de code zijn gebaseerd op de library gemaakt door '[supersjimmie](http
    * Mini Micro JST 2.0 PH 5-Pin Connector plug met Draden
    * PJ-307 3.5mm Stereo Jack Socket Audio Jack Connector PCB - 5PIN 
 
-**Ik heb nog een aantal complete units over. Een complete en geteste unit kost € 28,50. Mocht je interesse hebben dan kun je dat hier doorgeven:** https://goo.gl/forms/1Ybok9JMKyDsI6RI2 
-
-<img src="https://github.com/arnemauer/Ducobox-ESPEasy-Plugin/raw/master/Screenshots%20Duco%20Network%20Tool/HARDWARE.jpg" width="500">  
+<img src="https://github.com/arnemauer/Ducobox-ESPEasy-Plugin/raw/master/Screenshots/HARDWARE.jpg" width="500">  
 
  ## Data
 
