@@ -186,14 +186,29 @@ uint8_t CC1101::receiveData(CC1101Packet* packet)
 uint8_t i;
 uint8_t packet_length[1];
 
-	// get first byte of packet => contains total bytes of message (excl. crc)
-	readBurstRegister(packet_length, CC1101_RXFIFO, 1);
+// do we need to read out the bytes in fifo or only read the bytes in packet length (first byte)
+//uint8_t rxBytes = readRegisterWithSyncProblem(CC1101_RXBYTES, CC1101_STATUS_REGISTER);
+//	rxBytes = rxBytes & CC1101_BITS_RX_BYTES_IN_FIFO;
+	
+	//check for rx fifo overflow
+	if ((readRegisterWithSyncProblem(CC1101_MARCSTATE, CC1101_STATUS_REGISTER) & CC1101_BITS_MARCSTATE) == CC1101_MARCSTATE_RXFIFO_OVERFLOW)
+	{
+		writeCommand(CC1101_SIDLE);	//idle
+		writeCommand(CC1101_SFRX); //flush RX buffer
+		writeCommand(CC1101_SRX); //switch to RX state	
+		packet->length = 0;		
 
-	// GET bytes of RX FIFO
-	packet_length[0] = packet_length[0] + 2; // add two crc bytes
-	readBurstRegister(packet->data, CC1101_RXFIFO, packet_length[0]);
+	}else{
 
-	packet->length = packet_length[0];		
+			// get first byte of packet => contains total bytes of message (excl. crc)
+			readBurstRegister(packet_length, CC1101_RXFIFO, 1);
+
+			// GET bytes of RX FIFO
+			packet_length[0] = packet_length[0] + 2; // add two crc bytes
+			readBurstRegister(&packet->data[0], CC1101_RXFIFO, packet_length[0]);
+
+			packet->length = packet_length[0];		
+	}
 
 	return packet->length;
 }

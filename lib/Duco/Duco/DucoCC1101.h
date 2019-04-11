@@ -104,8 +104,9 @@ class DucoCC1101 : protected CC1101
 		uint8_t testCounter;
 		uint8_t ducoboxLastRssiByte;
 
-		String logMessages[15]; // to store some log messages from library
-		uint8_t numberOfLogmessages;
+		String logMessages[10]; // to store some log messages from library
+		uint8_t numberOfLogmessages = 0;
+		String logline; // used to build a log message
 
 		unsigned long ackTimer;
 	//functions
@@ -133,7 +134,7 @@ class DucoCC1101 : protected CC1101
 		}
 		uint8_t* getnetworkID() { return networkId; }	
 
-		String* getLogMessage();
+		String getLogMessage(uint8_t messageNumber);
 		uint8_t getNumberOfLogMessages();
 
 
@@ -160,6 +161,11 @@ class DucoCC1101 : protected CC1101
 
 		void setLogMessage(String newLogMessage);
 
+
+
+  		char valToHex(uint8_t val);
+
+ 		String byteToHexString(uint8_t b);
 
 		// joinCO2NetworkId
 		void sendJoin3Packet();

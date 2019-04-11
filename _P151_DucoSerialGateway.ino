@@ -105,14 +105,13 @@ boolean Plugin_151(byte function, struct EventStruct *event, String& string)
     case PLUGIN_WEBFORM_LOAD:
       {
 
-        addFormNote(F("Dont use 'IDX' above!"));
-        addFormNumericBox(F("Domoticz - IDX Flow percentage:"), F("Plugin_151_IDX1"), Settings.TaskDevicePluginConfig[event->TaskIndex][0], 0,255);
-        addFormNumericBox(F("Domoticz - IDX DUCOBOX status:"), F("Plugin_151_IDX2"), Settings.TaskDevicePluginConfig[event->TaskIndex][1], 0,255);
-        addFormNumericBox(F("Domoticz - IDX CO2-sensor PPM:"), F("Plugin_151_IDX3"), Settings.TaskDevicePluginConfig[event->TaskIndex][2], 0,255);
-        addFormNumericBox(F("Domoticz - IDX CO2-sensor tempertur:"), F("Plugin_151_IDX4"), Settings.TaskDevicePluginConfig[event->TaskIndex][3], 0, 255);
-        addFormNumericBox(F("Ducobox nodenumber (default: 1)"), F("Plugin_151_ducobox_nodenumber"), Settings.TaskDevicePluginConfig[event->TaskIndex][4], 0,255);
-        addFormNumericBox(F("CO2 controller nodenumber:"), F("Plugin_151_co2controller_nodenumber"), Settings.TaskDevicePluginConfig[event->TaskIndex][5], 0,255);
-        addFormNote(F("Dont use 'Send Data to controller' below!"));
+        addFormNote(F("For use with domoticz you can define an idx per value. If you use this you can ignore 'Send to Controller' below."));
+        addFormNumericBox(F("IDX Flow percentage:"), F("Plugin_151_IDX1"), Settings.TaskDevicePluginConfig[event->TaskIndex][0], 0,5000);
+        addFormNumericBox(F("IDX DUCOBOX status:"), F("Plugin_151_IDX2"), Settings.TaskDevicePluginConfig[event->TaskIndex][1], 0,5000);
+        addFormNumericBox(F("IDX CO2-sensor PPM:"), F("Plugin_151_IDX3"), Settings.TaskDevicePluginConfig[event->TaskIndex][2], 0,5000);
+        addFormNumericBox(F("IDX CO2-sensor temperture:"), F("Plugin_151_IDX4"), Settings.TaskDevicePluginConfig[event->TaskIndex][3], 0, 5000);
+        addFormNumericBox(F("Ducobox nodenumber (default: 1)"), F("Plugin_151_ducobox_nodenumber"), Settings.TaskDevicePluginConfig[event->TaskIndex][4], 0,1000);
+        addFormNumericBox(F("CO2 controller nodenumber:"), F("Plugin_151_co2controller_nodenumber"), Settings.TaskDevicePluginConfig[event->TaskIndex][5], 0,1000);
 
         success = true;
         break;
@@ -164,18 +163,25 @@ boolean Plugin_151(byte function, struct EventStruct *event, String& string)
                 addLog(LOG_LEVEL_DEBUG, "[P151] DUCO SER GW: read networkList");
                 readCO2PPM();                
 
-                UserVar[event->BaseVarIndex]   = duco_data[0]; // flow percentage
-                //Plugin_151_Controller_Update(task_index, event->BaseVarIndex,  Settings.TaskDevicePluginConfig[event->TaskIndex][0], SENSOR_TYPE_SINGLE,0);
+                if(UserVar[event->BaseVarIndex] != duco_data[0]){
+                    UserVar[event->BaseVarIndex]   = duco_data[0]; // flow percentage
+                    Plugin_151_Controller_Update(task_index, event->BaseVarIndex,  Settings.TaskDevicePluginConfig[event->TaskIndex][0], SENSOR_TYPE_SINGLE,0);
+                }
 
-                UserVar[event->BaseVarIndex+1]   = duco_data[1]; // flow percentage
-                //Plugin_151_Controller_Update(task_index, event->BaseVarIndex+1,   Settings.TaskDevicePluginConfig[event->TaskIndex][1], SENSOR_TYPE_SINGLE,0);
+                if(UserVar[event->BaseVarIndex+1] != duco_data[1]){
+                    UserVar[event->BaseVarIndex+1]   = duco_data[1]; // flow percentage
+                    Plugin_151_Controller_Update(task_index, event->BaseVarIndex+1,   Settings.TaskDevicePluginConfig[event->TaskIndex][1], SENSOR_TYPE_SINGLE,0);
+                }
 
-                UserVar[event->BaseVarIndex+2]   = duco_data[2]; // flow percentage
-                //Plugin_151_Controller_Update(task_index, event->BaseVarIndex+2,  Settings.TaskDevicePluginConfig[event->TaskIndex][2], SENSOR_TYPE_SINGLE,0);
+                if(UserVar[event->BaseVarIndex+2] != duco_data[2]){
+                    UserVar[event->BaseVarIndex+2]   = duco_data[2]; // flow percentage
+                    Plugin_151_Controller_Update(task_index, event->BaseVarIndex+2,  Settings.TaskDevicePluginConfig[event->TaskIndex][2], SENSOR_TYPE_SINGLE,0);
+                }
 
-                UserVar[event->BaseVarIndex+3]   = duco_data[3]; // flow percentage
-                //Plugin_151_Controller_Update(task_index,event->BaseVarIndex+3,   Settings.TaskDevicePluginConfig[event->TaskIndex][3], SENSOR_TYPE_SINGLE,1);
-
+                if(UserVar[event->BaseVarIndex+3] != duco_data[3]){
+                    UserVar[event->BaseVarIndex+3]   = duco_data[3]; // flow percentage
+                    Plugin_151_Controller_Update(task_index,event->BaseVarIndex+3,   Settings.TaskDevicePluginConfig[event->TaskIndex][3], SENSOR_TYPE_SINGLE,1);
+                }
                 //sendData(event);
                 
             } // end off   if (Plugin_151_init)
@@ -382,10 +388,6 @@ bool checkCommandInResponse(uint8_t command[]){
     // row 3 = "  node|addr|type|ptcl|cerr|prnt|asso|stts|stat|cntdwn|%dbt|trgt|cval|snsr|ovrl|capin |capout|tree|temp|info" (header)
 
 
-
-
-
-
       /////////// READ VENTILATION % ///////////
             // row 4 = duco box
             // 10th column is %dbt = ventilation%.
@@ -527,23 +529,16 @@ float parseNodeTemperature(uint8_t nodeNumber){
         // logging
         String logstring4 = F("co2 temp valuebytes: ");
         char lossebyte4[25];
-             sprintf_P(lossebyte4, PSTR("raw = %02X %02X %02X "), serial_buf[start_CO2temp_byte],serial_buf[start_CO2temp_byte+1],serial_buf[start_CO2temp_byte+2]);
+        sprintf_P(lossebyte4, PSTR("raw = %02X %02X %02X "), serial_buf[start_CO2temp_byte],serial_buf[start_CO2temp_byte+1],serial_buf[start_CO2temp_byte+2]);
         logstring4 += lossebyte4;
-        
         sprintf_P(lossebyte4, PSTR("%02X %02X %02X "), CO2temp_value_bytes[0],CO2temp_value_bytes[1],CO2temp_value_bytes[2]);
         logstring4 += lossebyte4;
-
         for (int vv = 0; vv <= 20; vv++) {
             sprintf_P(lossebyte4, PSTR("%02X "), CO2temp_value_bytes[start_CO2temp_byte+vv]);
-        logstring4 += lossebyte4;
-
+            logstring4 += lossebyte4;
         }
-
-
         addLog(LOG_LEVEL_DEBUG, logstring4);
         delay(20);
-
-
 
         float temp_CO2_temp_value = (float)(CO2temp_value_bytes[0] *10) + (float)CO2temp_value_bytes[1] + (float)(CO2temp_value_bytes[2]/10.0);
         if (temp_CO2_temp_value >= 0 && temp_CO2_temp_value <= 50){ // between
@@ -558,7 +553,6 @@ float parseNodeTemperature(uint8_t nodeNumber){
 
 // read CO2 temp, ventilation %, DUCO status
 void readNetworkList(){
-    
     addLog(LOG_LEVEL_DEBUG, "[P151] DUCO SER GW: start readNetworkList");
 
     // SEND COMMAND
@@ -567,6 +561,8 @@ void readNetworkList(){
     // if succesfully send command then receive response
     if(commandSendResult){
         if(receiveSerialData()){
+            logArray(serial_buf, P151_bytes_read-1, 0);
+
             if(checkCommandInResponse(answerReadNetwork)){
                 duco_data[0] = parseVentilationPercentage(); // parse ventilation percentage from data
                 duco_data[1] = (float)parseVentilationStatus(); // parse ventilationstatus from data
@@ -709,29 +705,26 @@ String logstring5 = F("start_CO2_PPM_byte: ");
 
 
 int logArray(uint8_t array[], int len, int fromByte) {
-unsigned int counter= 1;
+    unsigned int counter= 1;
 
-  String logstring = F("Pakket ontvangen: ");
-  char lossebyte[6];
+    String logstring = F("[P151] DUCO SER GW: Pakket ontvangen: ");
+    char lossebyte[6];
 
-  for (int i = fromByte; i <= len-1; i++) {
+    for (int i = fromByte; i <= len-1; i++) {
 
-      sprintf_P(lossebyte, PSTR("%02X"), array[i]);
-      logstring += lossebyte;
-      if( (counter * 60) == i){
-        counter++;
-        logstring += F("END");
-
-        addLog(LOG_LEVEL_ERROR,logstring);
-        delay(50);
-         logstring = F("");
-      }
-
-  }
-
-  logstring += F("END");
- addLog(LOG_LEVEL_ERROR,logstring);
- return -1;
+        sprintf_P(lossebyte, PSTR("%02X"), array[i]);
+        logstring += lossebyte;
+        if( (counter * 60) == i){
+            counter++;
+            logstring += F("END");
+            addLog(LOG_LEVEL_INFO,logstring);
+            delay(50);
+            logstring = F("");
+        }
+    }
+    logstring += F("END");
+    addLog(LOG_LEVEL_INFO,logstring);
+    return -1;
 }
 
 
@@ -740,18 +733,12 @@ unsigned int counter= 1;
 void Plugin_151_Controller_Update(byte TaskIndex, byte BaseVarIndex, int IDX, byte SensorType, int valueDecimals)
 {
 
-//if (Settings.Protocol && IDX > 0)
-//{
-LoadTaskSettings(TaskIndex);
-// settings.procotol = 3 bytes, 3 controllers. loop en check if enabled?
-//for (byte x=0; x < CONTROLLER_MAX; x++) { }
-// see /src/Controller.ino line 33-47
-
-ExtraTaskSettings.TaskDeviceValueDecimals[0] = valueDecimals;
+    LoadTaskSettings(TaskIndex);   
+    ExtraTaskSettings.TaskDeviceValueDecimals[0] = valueDecimals;
 
 // backward compatibility for version 148 and lower...
 #if defined(BUILD) && BUILD <= 150
-#define CONTROLLER_MAX 0
+    #define CONTROLLER_MAX 0
 #endif
 
 for (byte x=0; x < CONTROLLER_MAX; x++){
@@ -759,8 +746,6 @@ for (byte x=0; x < CONTROLLER_MAX; x++){
 
 if (Settings.ControllerEnabled[ControllerIndex] && Settings.Protocol[ControllerIndex])
   {
-
-
       byte ProtocolIndex = getProtocolIndex(Settings.Protocol[ControllerIndex]);
       struct EventStruct TempEvent;
       TempEvent.TaskIndex = TaskIndex;
@@ -776,4 +761,4 @@ if (Settings.ControllerEnabled[ControllerIndex] && Settings.Protocol[ControllerI
   }
 
 }
-//}
+

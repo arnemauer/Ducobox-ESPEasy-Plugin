@@ -33,12 +33,17 @@ DucoCC1101::~DucoCC1101()
 } //~DucoCC1101
 
 
-String* DucoCC1101::getLogMessage(){
-	return logMessages;
+String DucoCC1101::getLogMessage(uint8_t messageNumber){
+	return logMessages[messageNumber];
 }
 
 void DucoCC1101::setLogMessage(String newLogMessage){
-	this->numberOfLogmessages++;
+	if(this->numberOfLogmessages == 9){
+		this->numberOfLogmessages = 0;
+	}else{
+		this->numberOfLogmessages++;
+	}
+
 	logMessages[this->numberOfLogmessages] = newLogMessage;
 }
 
@@ -162,6 +167,22 @@ bool DucoCC1101::pollNewDeviceAddress(){
 }
 
 
+  char DucoCC1101::valToHex(uint8_t val) {
+    if ((val & 0x0f) < 10)
+      return ('0' + val);
+    else
+      return ('a' + (val - 10));
+  }
+
+  String DucoCC1101::byteToHexString(uint8_t b) {
+    String buffer = "";
+    buffer += valToHex(b & 0x0f);
+    b >>= 4;
+    buffer = valToHex(b & 0x0f) + buffer;
+    return buffer;
+  }
+
+
 
 bool DucoCC1101::checkForNewPacket()
 {
@@ -179,37 +200,33 @@ bool DucoCC1101::checkForNewPacket()
 		memcpy(&inDucoPacket.data, &inMessage.data[8],(inMessage.length-8));
 		inDucoPacket.dataLength = (inMessage.length-8);
 
-		String log2 = F("[P150] DUCO RF GW: Received message [");
-		log2 += String(inDucoPacket.deviceIdSender, DEC);
-		log2 += F(" => ");
-		log2 += String(inDucoPacket.deviceIdReceiver, DEC);
-		log2 += F(", ");
-		log2 += String(inDucoPacket.deviceIdSender, DEC);
-		log2 += F(" => ");
-		log2 += String(inDucoPacket.deviceIdReceiver, DEC);
-
-		log2 += F("] NetworkID: [");
-		log2 += String(inDucoPacket.networkId[0], HEX);
-		log2 += String(inDucoPacket.networkId[1], HEX);
-		log2 += String(inDucoPacket.networkId[2], HEX);
-		log2 += String(inDucoPacket.networkId[3], HEX);
-		log2 += F("] Type: [");
-		log2 += String(inDucoPacket.messageType, HEX);
-		log2 += F("] Bytes:[");
-		log2 += String(inMessage.length, DEC);
-		log2 += F("] Counter:[");
-		log2 += String(inDucoPacket.counter, HEX);
-		log2 += F("] Message:[");
+		// CREATE LOG ENTRY OF RECEIVED PACKET
+		String log = F("[P150] DUCO RF GW: Received message [SNDR:");
+		log += String(inDucoPacket.deviceIdSender, DEC);
+		log += F("; RECVR: ");
+		log += String(inDucoPacket.deviceIdReceiver, DEC);
+		log += F("; SNDR2:");
+		log += String(inDucoPacket.deviceIdSender2, DEC);
+		log += F("; RECVR2: ");
+		log += String(inDucoPacket.deviceIdReceiver2, DEC);
+		log += F("] NetworkID: [");
+		log += String(inDucoPacket.networkId[0], HEX) + String(inDucoPacket.networkId[1], HEX) + String(inDucoPacket.networkId[2], HEX) + String(inDucoPacket.networkId[3], HEX);
+		log += F("] Type: [");
+		log += String(inDucoPacket.messageType, HEX);
+		log += F("] Bytes:[");
+		log += String(inMessage.length, DEC);
+		log += F("] Counter:[");
+		log += String(inDucoPacket.counter, HEX);
+		log += F("] Message:[");
 
 		//log received bytes 
 		for (int i = 0; i < inDucoPacket.dataLength; i++) {
-			log2 += String(inDucoPacket.data[i], HEX);
-			log2 += F(", ");
+			log += byteToHexString(inDucoPacket.data[i]);
+			log += F(", ");
 		}
-		log2 += F("]");
+		log += F("]");
 
-		setLogMessage(log2);
-    	//setLogMessage();
+		setLogMessage(log);
 
 		//save RSSI value if message received from ducobox
 		if(inDucoPacket.deviceIdSender == 0x01){
@@ -229,13 +246,13 @@ bool DucoCC1101::checkForNewPacket()
 			}
 
 			case ducomsg_join2:{
-			    setLogMessage(F("[P150] DUCO RF GW: messagetype: JOIN2"));
+			  setLogMessage(F("[P150] DUCO RF GW: messagetype: JOIN2"));
 				sendJoin3Packet();
 				break;
 			}
 
 			case ducomsg_join4:{
-			    setLogMessage(F("[P150] DUCO RF GW: messagetype: JOIN4"));
+			  setLogMessage(F("[P150] DUCO RF GW: messagetype: JOIN4"));
 				// if we are waiting for disjoin confirmation, finish disjoin
 				if(ducoDeviceState == ducoDeviceState_disjoinWaitingForConfirmation){
 					finishDisjoin();
@@ -248,11 +265,11 @@ bool DucoCC1101::checkForNewPacket()
 					setLogMessage(F("[P150] DUCO RF GW: received join4 message but join already finished, check address and resend ACK."));
 					if(inDucoPacket.data[5] == this->deviceAddress){
 						sendAck();
-						setLogMessage(F("[P150] DUCO RF GW: sendJoinFinish: another ACK sent!"));
+						setLogMessage(F("[P150] DUCO RF GW: SendJoinFinish: another ACK sent!"));
 					}else{
-						setLogMessage(F("[P150] DUCO RF GW: no match between join4 address and our deviceid. ingoring message..."));
+						setLogMessage(F("[P150] DUCO RF GW: No match between join4 address and our deviceid. ingoring message..."));
 					}
-			    setLogMessage(F("[P150] DUCO RF GW: ignore JOIN4. No join or disjoin action running..."));
+			    setLogMessage(F("[P150] DUCO RF GW: Ignore JOIN4. No join or disjoin action running..."));
 				}
 				break;
 			}
@@ -365,11 +382,11 @@ void DucoCC1101::sendDisjoinPacket(){
 }
 
 void DucoCC1101::finishDisjoin(){
-	setLogMessage(F("[P150] DUCO RF GW: finishDisjoin()"));
+	setLogMessage(F("[P150] DUCO RF GW: FinishDisjoin()"));
 	if(matchingNetworkId(inDucoPacket.networkId)){
 		if(matchingDeviceAddress(inDucoPacket.deviceIdReceiver)){
 			sendAck(); 						// then send ack
-			setLogMessage(F("[P150] DUCO RF GW: device disjoining finished!"));
+			setLogMessage(F("[P150] DUCO RF GW: Device disjoining finished!"));
 			// remove networkID and deviceID
 			this->networkId[0] = 0x00;
 			this->networkId[1] = 0x00;
@@ -405,7 +422,7 @@ void DucoCC1101::sendJoinPacket(){
 
 	sendData(&outMessage);
 	//finishTransfer();
-	setLogMessage(F("[P150] DUCO RF GW: joinpacket sent"));
+	setLogMessage(F("[P150] DUCO RF GW: Joinpacket sent"));
 	ducoDeviceState = ducoDeviceState_join1;
 }
 
@@ -430,7 +447,7 @@ void DucoCC1101::sendJoin3Packet(){
 	}
 
 	if(validJoin2Packet){
-		setLogMessage(F("[P150] DUCO RF GW: sendJoin3Packet: valid join2 packet received!"));
+		setLogMessage(F("[P150] DUCO RF GW: SendJoin3Packet: valid join2 packet received!"));
 
 		outDucoPacket.deviceIdSender =  0x00;
 		outDucoPacket.deviceIdReceiver = 0x01;
@@ -561,11 +578,6 @@ bool DucoCC1101::matchingDeviceAddress(uint8_t compDeviceAddress){
 
 bool DucoCC1101::checkForNewPacketInRXFifo(){
 	uint8_t rxBytes = readRegisterWithSyncProblem(CC1101_RXBYTES, CC1101_STATUS_REGISTER);
-	
-	String log2 = F("[P150] DUCO RF GW: status register byte -bit7=overflow(HEX): ");
-	log2 += String( rxBytes, HEX);
-	setLogMessage(log2);
-
 	rxBytes = rxBytes & CC1101_BITS_RX_BYTES_IN_FIFO;
 
 	if(rxBytes > 0){
@@ -661,6 +673,9 @@ void DucoCC1101::sendConfirmationNewVentilationMode(){
 	sendData(&outMessage);
 	setLogMessage(F("[P150] DUCO RF GW: SEND sendConfirmationNewVentilationMode done!"));
 }
+
+
+
 
 void DucoCC1101::sendNodeParameterValue(){
 	uint8_t parameter = inDucoPacket.data[5];
@@ -759,6 +774,9 @@ void DucoCC1101::sendNodeParameterValue(){
 	log2 += String( parameter, DEC);
 	setLogMessage(log2);
 }
+
+
+
 
 void DucoCC1101::sendMultipleNodeParameterValue(){
 	setLogMessage(F("[P150] DUCO RF GW: FUNC: sendMultipleNodeParameterValue"));
@@ -871,6 +889,7 @@ void DucoCC1101::sendAck(){
 	setLogMessage(F("[P150] DUCO RF GW: SEND ACK done!"));
 }
 
+
 void DucoCC1101::prefillDucoPacket(DucoPacket *ducoOutPacket, uint8_t receiverAddress){
 	ducoOutPacket->deviceIdSender =  deviceAddress;
 	ducoOutPacket->deviceIdReceiver = receiverAddress;
@@ -878,6 +897,7 @@ void DucoCC1101::prefillDucoPacket(DucoPacket *ducoOutPacket, uint8_t receiverAd
 	ducoOutPacket->deviceIdReceiver2 = receiverAddress;
 	memcpy(ducoOutPacket->networkId,networkId,4 );
 }
+
 
 void DucoCC1101::ducoToCC1101Packet(DucoPacket *duco, CC1101Packet *packet)
 {

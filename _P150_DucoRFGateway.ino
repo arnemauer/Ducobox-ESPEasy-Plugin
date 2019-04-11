@@ -29,7 +29,11 @@ int PLUGIN_150_State=0; // after startup it is assumed that the fan is running l
 int PLUGIN_150_OldState=1;
 
 int8_t Plugin_150_IRQ_pin=-1;
+int8_t Plugin_150_LED_pin=-1;
+bool Plugin_150_LED_status=false; // false = off, true=on
+
 bool PLUGIN_150_InitRunned = false;
+
 
 
 #define PLUGIN_150
@@ -47,7 +51,7 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 	case PLUGIN_DEVICE_ADD:
 		{
 			Device[++deviceCount].Number = PLUGIN_ID_150;
-            Device[deviceCount].Type = DEVICE_TYPE_SINGLE;
+            Device[deviceCount].Type = DEVICE_TYPE_DUAL;
             Device[deviceCount].VType = SENSOR_TYPE_SINGLE;
 			Device[deviceCount].Ports = 0;
 			Device[deviceCount].PullUpOption = false;
@@ -71,6 +75,14 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 			strcpy_P(ExtraTaskSettings.TaskDeviceValueNames[0], PSTR(PLUGIN_VALUENAME1_150));
 			break;
 		}
+
+	case PLUGIN_GET_DEVICEGPIONAMES:
+      {
+        event->String1 = formatGpioName_input(F("Interrupt pin (CC1101)"));
+        event->String2 = formatGpioName_output(F("Status LED"));
+        break;
+      }
+
   
   		
 	case PLUGIN_INIT: {
@@ -102,7 +114,12 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 
 		Plugin_150_IRQ_pin = Settings.TaskDevicePin1[event->TaskIndex];
 		pinMode(Plugin_150_IRQ_pin, INPUT);
-			
+
+			Plugin_150_LED_pin = Settings.TaskDevicePin2[event->TaskIndex];
+		if(Plugin_150_LED_pin != -1){
+			pinMode(Plugin_150_LED_pin, OUTPUT);			
+		}
+
 		String log3 = F("[P150] DUCO RF GW: Interrupt cc1101 initialized: IRQ-pin ");
 		log3 += Plugin_150_IRQ_pin;
 		addLog(LOG_LEVEL_INFO, log3);
@@ -127,7 +144,17 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 
 
 	case PLUGIN_TEN_PER_SECOND: {
+
+		// set statusled off
+		if(Plugin_150_LED_pin != -1){
+			if(Plugin_150_LED_status){
+				digitalWrite(Plugin_150_LED_pin, HIGH);
+				Plugin_150_LED_status = false;
+			}
+		}
+
 		noInterrupts();
+
 		PLUGIN_150_rf.checkForAck();
 		if(PLUGIN_150_rf.pollNewDeviceAddress()){
 			memcpy(PLUGIN_150_ExtraSettings.networkId, PLUGIN_150_rf.getnetworkID(), 4); //convert char array to uint8_t
@@ -281,9 +308,17 @@ void PLUGIN_150_DUCOinterrupt()
 	PLUGIN_150_DUCOticker.once_ms(1, PLUGIN_150_DUCOcheck);	
 }
 
+
 void PLUGIN_150_DUCOcheck() {
+
+	if(Plugin_150_LED_pin != -1){
+		digitalWrite(Plugin_150_LED_pin, LOW);
+		Plugin_150_LED_status = true;
+	}
+	
 	noInterrupts();
-	addLog(LOG_LEVEL_DEBUG, "[P150] DUCO RF GW: RF signal received\n");
+	addLog(LOG_LEVEL_DEBUG,F("[P150] DUCO RF GW: RF signal received"));
+
 	if (PLUGIN_150_rf.checkForNewPacket()){
 		int ventilationState = PLUGIN_150_rf.getCurrentVentilationMode();
 
@@ -300,18 +335,23 @@ void PLUGIN_150_DUCOcheck() {
         }
 
 		uint8_t numberOfLogMessages = PLUGIN_150_rf.getNumberOfLogMessages();
-		String* logArray = PLUGIN_150_rf.getLogMessage();
-
 		for(int i=0; i< numberOfLogMessages;i++){
-			addLog(LOG_LEVEL_INFO, logArray[i]);
+			addLog(LOG_LEVEL_INFO, PLUGIN_150_rf.getLogMessage(i));
 		}
-
+		
 		// If new package is arrived while reading FIFO CC1101 there is no new interrupt
 		if(PLUGIN_150_rf.checkForNewPacketInRXFifo()){
-			addLog(LOG_LEVEL_DEBUG, "[P150] DUCO RF GW: Bytes left in RX FIFO\n");
+
+			uint8_t numberOfLogMessages = PLUGIN_150_rf.getNumberOfLogMessages();
+				for(int i=0; i< numberOfLogMessages;i++){
+				addLog(LOG_LEVEL_INFO, PLUGIN_150_rf.getLogMessage(i));
+			}		
+
+			addLog(LOG_LEVEL_DEBUG, F("[P150] DUCO RF GW: Bytes left in RX FIFO"));
 			PLUGIN_150_DUCOinterrupt();
 		}
 	}
+
 	interrupts();
 }
   
