@@ -175,7 +175,7 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
       //Publish new data when vars are changed or init has runned or timer is running (update every 2 sec)
       if  ((PLUGIN_150_OldState!=PLUGIN_150_State) || PLUGIN_150_InitRunned)
       {
-		addLog(LOG_LEVEL_DEBUG, F("[P150] DUCO RF GW: UPDATE by PLUGIN_ONCE_A_SECOND"));
+		addLog(LOG_LEVEL_DEBUG, F("[P150] DUCO RF GW: ventilation mode changed -> UPDATE by PLUGIN_ONCE_A_SECOND"));
 		PLUGIN_150_Publishdata(event);
         sendData(event);
 
@@ -228,19 +228,20 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 				printWebString += log5;
 
 				PLUGIN_150_rf.requestVentilationMode(ventilationMode,percentage,0xD2); // temp=210 = 21.0C
+				
 			}
 
 			success = true;
 		}
 
-		else if (param1.equalsIgnoreCase(F("JOIN")))
+		else if (cmd.equalsIgnoreCase(F("JOIN")))
 			{
 				addLog(LOG_LEVEL_INFO, F("[P150] DUCO RF GW: Sent command for 'join' to DUCO unit"));
 				printWebString += F("[P150] DUCO RF GW: Sent command for 'join' to DUCO unit");
 				PLUGIN_150_rf.sendJoinPacket();
 				success = true;
 			}
-		else if (param1.equalsIgnoreCase(F("DISJOIN")))
+		else if (cmd.equalsIgnoreCase(F("DISJOIN")))
 			{
 				addLog(LOG_LEVEL_INFO, F("[P150] DUCO RF GW: Sent command for 'disjoin' to DUCO unit"));
 				printWebString += F("[P150] DUCO RF GW: Sent command for 'disjoin' to DUCO unit");
@@ -341,12 +342,6 @@ void PLUGIN_150_DUCOcheck() {
 		
 		// If new package is arrived while reading FIFO CC1101 there is no new interrupt
 		if(PLUGIN_150_rf.checkForNewPacketInRXFifo()){
-
-			uint8_t numberOfLogMessages = PLUGIN_150_rf.getNumberOfLogMessages();
-				for(int i=0; i< numberOfLogMessages;i++){
-				addLog(LOG_LEVEL_INFO, PLUGIN_150_rf.getLogMessage(i));
-			}		
-
 			addLog(LOG_LEVEL_DEBUG, F("[P150] DUCO RF GW: Bytes left in RX FIFO"));
 			PLUGIN_150_DUCOinterrupt();
 		}
