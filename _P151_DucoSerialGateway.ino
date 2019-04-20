@@ -20,6 +20,9 @@
 
 boolean Plugin_151_init = false;
 
+            String loggy;
+
+
 //18 bytes
 #define CMD_READ_NODE_SIZE 18
 uint8_t cmdReadNode[CMD_READ_NODE_SIZE] = { 0x4e , 0x6f , 0x64 , 0x65 , 0x50 , 0x61 , 0x72 , 0x61 , 0x47 , 0x65 , 0x74, 0x20, 0x32, 0x20, 0x37, 0x34, 0x0d, 0x0a};
@@ -31,6 +34,10 @@ uint8_t answerReadNode[ANSWER_READ_NODE_SIZE] = {0x6e, 0x6f , 0x64 , 0x65 , 0x70
 uint8_t cmdReadNetwork[CMD_READ_NETWORK_SIZE] = {0x4e, 0x65, 0x74, 0x77, 0x6f, 0x72, 0x6b, 0x0d, 0x0a};
 #define ANSWER_READ_NETWORK_SIZE 8
 uint8_t answerReadNetwork[ANSWER_READ_NETWORK_SIZE] = {0x6e, 0x65, 0x74, 0x77, 0x6f, 0x72, 0x6b, 0x0d};
+
+uint8_t ventilationColumnName[] = {0x25, 0x64, 0x62, 0x74}; // %dbt
+uint8_t ducoboxStatusColumnName[] =  {0x73, 0x74, 0x61, 0x74}; // stat = 0x73, 0x74, 0x61, 0x74
+uint8_t tempColumnName[] = {0x74, 0x65, 0x6d, 0x70};  //temp = 0x74, 0x65, 0x6d, 0x70
 
 const uint8_t DucoStatusModes [13][5] = 
 {
@@ -195,7 +202,65 @@ boolean Plugin_151(byte function, struct EventStruct *event, String& string)
 }
 
 
+//    // row 3 = "  node|addr|type|ptcl|cerr|prnt|asso|stts|stat|cntdwn|%dbt|trgt|cval|snsr|ovrl|capin |capout|tree|temp|info" (header)
 
+unsigned int getColumnNumberByColumnName(uint8_t columnName[]){
+    int currentRow = 3; // row with columnnames
+    int separatorCounter = 0; 
+    int columnNumber = 0;
+    //bool startColumnNameCheck = true;
+
+    int charCount = 0;
+
+    // count characters of the columnName whe are looking for
+    charCount = sizeof(columnName)/sizeof(uint8_t);
+
+           // String loggy = F("[P151] DUCO SER GW: chars: " );
+            char lossebyte[6];
+         
+           loggy = F("[P151] loggy: " );
+
+
+    // loop through all characters of row 3 (row with columnnames)
+    for (int j = rows[currentRow]; j <= rows[currentRow+1]; j++) {
+        if(serial_buf[j] == 0x7C){
+            separatorCounter++;
+
+            // check if our current position + the columnname isn't exceeding the total characters of the row 
+            if(j+charCount <= rows[currentRow+1]){
+                // after each separator start checking if the column name matches
+                for(int charNr = 0; charNr < charCount; charNr++ ){ // loop through every character of the columnname till all characters are matched
+                    if(serial_buf[j+1+charNr] == columnName[charNr]){
+
+                        sprintf_P(lossebyte, PSTR("%c "), serial_buf[j+1+charNr]);
+                        loggy += lossebyte;
+                        loggy += F("-");
+                        sprintf_P(lossebyte, PSTR("%c "), columnName[charNr]);
+                        loggy += lossebyte;
+                        loggy += F(" | ");
+
+                        loggy += F(" >");
+                        sprintf_P(lossebyte, PSTR("%d "), charNr);
+                        loggy += lossebyte;
+                        loggy += F("=");
+                        sprintf_P(lossebyte, PSTR("%d "), charCount);
+                        loggy += lossebyte;
+                        loggy += F("< ");
+
+                        // we matched a character!
+                        if(charNr == (charCount-1)){ // check if we matched ALL characters of "columnName"
+                            return separatorCounter; // return the columnNumber of "columnName"
+                        }
+                    }else{
+                        break; // otherwise break out of this loop and wait till next separator
+                    }
+                }
+            }
+        } // end of if(serial_buf[j] == 0x7C){
+    }
+
+return 9999;
+}
 
 
 unsigned int getValueByNodeNumberAndColumn(uint8_t ducoNodeNumber,uint8_t ducoColumnNumber ){
@@ -203,17 +268,17 @@ unsigned int getValueByNodeNumberAndColumn(uint8_t ducoNodeNumber,uint8_t ducoCo
     unsigned int start_byte_number = 0;
     unsigned int end_byte_number = 0;
     unsigned int row_number;
-    for (int k = 4; k <= rowCounter; k++) {
+    for (int currentRow = 4; currentRow <= rowCounter; currentRow++) {
         unsigned int number_size = 0;
         unsigned int row_node_number = 0;
 
         for (int j = 0; j <= 6; j++) {
-            if( serial_buf[ rows[k]+j ] != 0x20){
-                if(serial_buf[ rows[k]+j ] >= '0' && serial_buf[ rows[k]+j ] <= '9'){
+            if( serial_buf[ rows[currentRow]+j ] != 0x20){
+                if(serial_buf[ rows[currentRow]+j ] >= '0' && serial_buf[ rows[currentRow]+j ] <= '9'){
                     if(number_size > 0){
-                        row_node_number = row_node_number + (( serial_buf[ rows[k]+j ] - '0' ) * (10 * number_size)) ;
+                        row_node_number = row_node_number + (( serial_buf[ rows[currentRow]+j ] - '0' ) * (10 * number_size)) ;
                     }else{
-                        row_node_number = row_node_number + ( serial_buf[ rows[k]+j ] - '0' );
+                        row_node_number = row_node_number + ( serial_buf[ rows[currentRow]+j ] - '0' );
                         number_size++;
                     }
                 }
@@ -222,8 +287,8 @@ unsigned int getValueByNodeNumberAndColumn(uint8_t ducoNodeNumber,uint8_t ducoCo
 
 
         if(row_node_number == ducoNodeNumber){
-            start_byte_number = rows[k]; //rows[k] == startbyte of row with device id
-            end_byte_number   = rows[k+1];
+            start_byte_number = rows[currentRow]; //rows[k] == startbyte of row with device id
+            end_byte_number   = rows[currentRow+1];
             //row_number        = k;
             break;
         }
@@ -317,34 +382,6 @@ bool receiveSerialData(){
 
     }// end while
 
-/*
-        int debugCounter = 0;
-        String logstring3 = F("SER BYTES: ");
-        char lossebyte3[10];
-
-            sprintf_P(lossebyte3, PSTR("%u "), P151_bytes_read);
-            logstring3 += lossebyte3;
-
-            addLog(LOG_LEVEL_INFO, logstring3);
-
-
-            logstring3 = F("Received serial data: ");
-
-        for (int jj = 0; jj <= P151_bytes_read; jj++) {
-            sprintf_P(lossebyte3, PSTR("%X "), serial_buf[jj]);
-            logstring3 += lossebyte3;
-
-            /*if(debugCounter == 30 || j == P151_bytes_read){
-                debugCounter = 0;
-                addLog(LOG_LEVEL_INFO, logstring3);
-                delay(10);
-                logstring3 = F("");
-            } */
-            //debugCounter++;
-        //}
-                     //   addLog(LOG_LEVEL_INFO, logstring3);
-
-
     if(stopwordCounter == 6){
         addLog(LOG_LEVEL_INFO, "[P151] DUCO SER GW: Package received with stopword.");
         return true;
@@ -393,15 +430,31 @@ bool checkCommandInResponse(uint8_t command[]){
             // 10th column is %dbt = ventilation%.
 float parseVentilationPercentage(){
     unsigned int temp_ventilation_value = 0;
-    unsigned int start_ventilation_byte = getValueByNodeNumberAndColumn( Settings.TaskDevicePluginConfig[task_index][4], 10); // ConfigLong[3] = ducobox node number
+    unsigned int ventilationPercentageColumnNumber = getColumnNumberByColumnName(ventilationColumnName); // %dbt = 0x25 0x64 0x62 0x74
+    if(ventilationPercentageColumnNumber == 9999){
+        return 0;
+    }
+    
+    //addLog(LOG_LEVEL_DEBUG, loggy);
+    // delay(20);
+    /*
+       String logstring = F("[P151] DUCO SER GW: columnnumber  " );
+            char lossebyte[6];
+            sprintf_P(lossebyte, PSTR("%d "), ventilationPercentageColumnNumber);
+            logstring += lossebyte;
+            addLog(LOG_LEVEL_DEBUG, logstring);
+            delay(20);
+    */
 
-   String logstring5 = F("start_ventilation_byte: ");
-        char lossebyte9[25];
-        sprintf_P(lossebyte9, PSTR("%u"), start_ventilation_byte);
-        logstring5 += lossebyte9;
-        addLog(LOG_LEVEL_DEBUG, logstring5);
-        delay(20);
-
+    unsigned int start_ventilation_byte = getValueByNodeNumberAndColumn( Settings.TaskDevicePluginConfig[task_index][4], ventilationPercentageColumnNumber); // ConfigLong[3] = ducobox node number
+    /*
+    String logstring5 = F("start_ventilation_byte: ");
+    char lossebyte9[25];
+    sprintf_P(lossebyte9, PSTR("%u"), start_ventilation_byte);
+    logstring5 += lossebyte9;
+    addLog(LOG_LEVEL_DEBUG, logstring5);
+    delay(20);
+    */
     if(start_ventilation_byte > 0){
         unsigned int number_size = 0;
         unsigned int ventilation_value_bytes[3];
@@ -469,7 +522,12 @@ float parseVentilationPercentage(){
     // 22 -> "aut2" = Boost20min;
     // 23 -> "aut3" = Boost30min;
 int parseVentilationStatus(){
-    unsigned int start_ducoboxstatus_byte = getValueByNodeNumberAndColumn( Settings.TaskDevicePluginConfig[task_index][4], 8); // ConfigLong[3] = ducobox node number
+     unsigned int ducoboxStatusColumnNumber = getColumnNumberByColumnName(ducoboxStatusColumnName); // stat = 0x73, 0x74, 0x61, 0x74
+    if(ducoboxStatusColumnNumber == 9999){
+        return 0;
+    }
+
+    unsigned int start_ducoboxstatus_byte = getValueByNodeNumberAndColumn( Settings.TaskDevicePluginConfig[task_index][4], ducoboxStatusColumnNumber); // ConfigLong[3] = ducobox node number
 
     if(start_ducoboxstatus_byte > 0){
         uint8_t ventilationStatus = 255;
@@ -503,7 +561,12 @@ int parseVentilationStatus(){
 /////////// READ CO2 temperture % ///////////
 // column 18 = temp
 float parseNodeTemperature(uint8_t nodeNumber){
-    unsigned int start_CO2temp_byte = getValueByNodeNumberAndColumn( Settings.TaskDevicePluginConfig[task_index][5], 18); // TaskDevicePluginConfigLong[4] = CO2 controller node number
+    unsigned int tempColumnNumber = getColumnNumberByColumnName(tempColumnName); // temp = 0x74, 0x65, 0x6d, 0x70
+    if(tempColumnNumber == 9999){
+        return 0;
+    }
+
+    unsigned int start_CO2temp_byte = getValueByNodeNumberAndColumn( Settings.TaskDevicePluginConfig[task_index][5], tempColumnNumber); // TaskDevicePluginConfigLong[4] = CO2 controller node number
     uint8_t CO2temp_value_bytes[3];
 
         String logstring5 = F("[P151] DUCO SER GW: Start_CO2temp_byte: ");
