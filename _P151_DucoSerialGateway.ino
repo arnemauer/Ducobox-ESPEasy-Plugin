@@ -590,16 +590,18 @@ float parseNodeTemperature(uint8_t nodeNumber){
 
 
         // logging
-        String logstring4 = F("co2 temp valuebytes: ");
+        
+        String logstring4 = F("[P151] DUCO SER GW: co2 temp valuebytes: ");
         char lossebyte4[25];
         sprintf_P(lossebyte4, PSTR("raw = %02X %02X %02X "), serial_buf[start_CO2temp_byte],serial_buf[start_CO2temp_byte+1],serial_buf[start_CO2temp_byte+2]);
         logstring4 += lossebyte4;
         sprintf_P(lossebyte4, PSTR("%02X %02X %02X "), CO2temp_value_bytes[0],CO2temp_value_bytes[1],CO2temp_value_bytes[2]);
         logstring4 += lossebyte4;
+        /*
         for (int vv = 0; vv <= 20; vv++) {
             sprintf_P(lossebyte4, PSTR("%02X "), CO2temp_value_bytes[start_CO2temp_byte+vv]);
             logstring4 += lossebyte4;
-        }
+        }*/
         addLog(LOG_LEVEL_DEBUG, logstring4);
         delay(20);
 
@@ -660,7 +662,7 @@ void readCO2PPM(){
 
                 String logString = F("[P151] DUCO SER GW: CO2 PPM value = ");
                 char logData[10];
-                sprintf_P(logData, PSTR("%u"), duco_data[2]);
+                sprintf_P(logData, PSTR("%u"), temp_CO2PPM);
                 logString += logData;
                 addLog(LOG_LEVEL_DEBUG, logString);
              }
