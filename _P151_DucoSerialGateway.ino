@@ -655,7 +655,7 @@ void readCO2PPM(){
     // if succesfully send command then receive response
     if(commandSendResult){
         if(receiveSerialData()){
-            if(checkCommandInResponse(answerReadNode)){
+            if(checkCommandInResponse((byte*) command)){
                 unsigned int temp_CO2PPM = parseCO2PPM();
                 duco_data[2] = temp_CO2PPM;
 
