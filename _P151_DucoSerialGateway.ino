@@ -60,7 +60,23 @@ uint8_t serial_buf[SERIAL_BUFFER_SIZE];
 unsigned int P151_bytes_read = 0;
 uint8_t task_index = 0;
 
-float duco_data[4];
+typedef enum {
+    DUCO_DATA_FLOW = 0,
+    DUCO_DATA_STATUS = 1,
+    DUCO_DATA_CO2_PPM = 2,
+    DUCO_DATA_CO2_TEMP = 3,
+    DUCO_DATA_LAST = 4,
+} DucoDataTypes;
+float duco_data[DUCO_DATA_LAST];
+
+typedef enum {
+    PLUGIN_CONFIG_IDX_FLOW = 0,
+    PLUGIN_CONFIG_IDX_STATUS = 1,
+    PLUGIN_CONFIG_IDX_CO2_PPM = 2,
+    PLUGIN_CONFIG_IDX_CO2_TEMP = 3,
+    PLUGIN_CONFIG_DUCO_BOX_NODE = 4,
+    PLUGIN_CONFIG_CO2_NODE = 5,
+} PluginConfigs;
 
 int stopwordCounter = 0; // 0x0d 0x20 0x20 0x0d 0x3e 0x20
 unsigned int rows[15]; // byte number where a new row starts
@@ -110,12 +126,12 @@ boolean Plugin_151(byte function, struct EventStruct *event, String& string)
       {
 
         addFormNote(F("For use with domoticz you can define an idx per value. If you use this you can ignore 'Send to Controller' below."));
-        addFormNumericBox(F("IDX Flow percentage"), F("Plugin_151_IDX1"), Settings.TaskDevicePluginConfig[event->TaskIndex][0], 0,5000);
-        addFormNumericBox(F("IDX DUCOBOX status"), F("Plugin_151_IDX2"), Settings.TaskDevicePluginConfig[event->TaskIndex][1], 0,5000);
-        addFormNumericBox(F("IDX CO2-sensor PPM"), F("Plugin_151_IDX3"), Settings.TaskDevicePluginConfig[event->TaskIndex][2], 0,5000);
-        addFormNumericBox(F("IDX CO2-sensor temperture"), F("Plugin_151_IDX4"), Settings.TaskDevicePluginConfig[event->TaskIndex][3], 0, 5000);
-        addFormNumericBox(F("Ducobox nodenumber (default: 1)"), F("Plugin_151_ducobox_nodenumber"), Settings.TaskDevicePluginConfig[event->TaskIndex][4], 0,1000);
-        addFormNumericBox(F("CO2 controller nodenumber"), F("Plugin_151_co2controller_nodenumber"), Settings.TaskDevicePluginConfig[event->TaskIndex][5], 0,1000);
+        addFormNumericBox(F("IDX Flow percentage"), F("Plugin_151_IDX1"), Settings.TaskDevicePluginConfig[event->TaskIndex][PLUGIN_CONFIG_IDX_FLOW], 0,5000);
+        addFormNumericBox(F("IDX DUCOBOX status"), F("Plugin_151_IDX2"), Settings.TaskDevicePluginConfig[event->TaskIndex][PLUGIN_CONFIG_IDX_STATUS], 0,5000);
+        addFormNumericBox(F("IDX CO2-sensor PPM"), F("Plugin_151_IDX3"), Settings.TaskDevicePluginConfig[event->TaskIndex][PLUGIN_CONFIG_IDX_CO2_PPM], 0,5000);
+        addFormNumericBox(F("IDX CO2-sensor temperture"), F("Plugin_151_IDX4"), Settings.TaskDevicePluginConfig[event->TaskIndex][PLUGIN_CONFIG_IDX_CO2_TEMP], 0, 5000);
+        addFormNumericBox(F("Ducobox nodenumber (default: 1)"), F("Plugin_151_ducobox_nodenumber"), Settings.TaskDevicePluginConfig[event->TaskIndex][PLUGIN_CONFIG_DUCO_BOX_NODE], 0,1000);
+        addFormNumericBox(F("CO2 controller nodenumber"), F("Plugin_151_co2controller_nodenumber"), Settings.TaskDevicePluginConfig[event->TaskIndex][PLUGIN_CONFIG_CO2_NODE], 0,1000);
 
         success = true;
         break;
@@ -124,12 +140,12 @@ boolean Plugin_151(byte function, struct EventStruct *event, String& string)
     case PLUGIN_WEBFORM_SAVE:
       {
 
-        Settings.TaskDevicePluginConfig[event->TaskIndex][0] = getFormItemInt(F("Plugin_151_IDX1"));
-        Settings.TaskDevicePluginConfig[event->TaskIndex][1] = getFormItemInt(F("Plugin_151_IDX2"));
-        Settings.TaskDevicePluginConfig[event->TaskIndex][2] = getFormItemInt(F("Plugin_151_IDX3"));
-        Settings.TaskDevicePluginConfig[event->TaskIndex][3] = getFormItemInt(F("Plugin_151_IDX4"));
-        Settings.TaskDevicePluginConfig[event->TaskIndex][4] = getFormItemInt(F("Plugin_151_ducobox_nodenumber"));
-        Settings.TaskDevicePluginConfig[event->TaskIndex][5] = getFormItemInt(F("Plugin_151_co2controller_nodenumber"));
+        Settings.TaskDevicePluginConfig[event->TaskIndex][PLUGIN_CONFIG_IDX_FLOW] = getFormItemInt(F("Plugin_151_IDX1"));
+        Settings.TaskDevicePluginConfig[event->TaskIndex][PLUGIN_CONFIG_IDX_STATUS] = getFormItemInt(F("Plugin_151_IDX2"));
+        Settings.TaskDevicePluginConfig[event->TaskIndex][PLUGIN_CONFIG_IDX_CO2_PPM] = getFormItemInt(F("Plugin_151_IDX3"));
+        Settings.TaskDevicePluginConfig[event->TaskIndex][PLUGIN_CONFIG_IDX_CO2_TEMP] = getFormItemInt(F("Plugin_151_IDX4"));
+        Settings.TaskDevicePluginConfig[event->TaskIndex][PLUGIN_CONFIG_DUCO_BOX_NODE] = getFormItemInt(F("Plugin_151_ducobox_nodenumber"));
+        Settings.TaskDevicePluginConfig[event->TaskIndex][PLUGIN_CONFIG_CO2_NODE] = getFormItemInt(F("Plugin_151_co2controller_nodenumber"));
         success = true;
         break;
       }
@@ -140,10 +156,10 @@ boolean Plugin_151(byte function, struct EventStruct *event, String& string)
             Serial.begin(115200, SERIAL_8N1);
             Plugin_151_init = true;
 
-            duco_data[0] = 0; // flow %
-            duco_data[1] = 0; // DUCO_STATUS
-            duco_data[2] = 0; // CO2 ppm
-            duco_data[3] = 0.0; // co2 temp
+            duco_data[DUCO_DATA_FLOW] = 0; // flow %
+            duco_data[DUCO_DATA_STATUS] = 0; // DUCO_STATUS
+            duco_data[DUCO_DATA_CO2_PPM] = 0; // CO2 ppm
+            duco_data[DUCO_DATA_CO2_TEMP] = 0.0; // co2 temp
 
             // temp woraround, ESP Easy framework does not currently prepare this...
             for (byte y = 0; y < TASKS_MAX; y++){
@@ -164,27 +180,27 @@ boolean Plugin_151(byte function, struct EventStruct *event, String& string)
                 addLog(LOG_LEVEL_DEBUG, "[P151] DUCO SER GW: read networkList");
                 readNetworkList();
 
-                addLog(LOG_LEVEL_DEBUG, "[P151] DUCO SER GW: read networkList");
+                addLog(LOG_LEVEL_DEBUG, "[P151] DUCO SER GW: read CO2 PPM");
                 readCO2PPM();                
 
-                if(UserVar[event->BaseVarIndex] != duco_data[0]){
-                    UserVar[event->BaseVarIndex]   = duco_data[0]; // flow percentage
-                    Plugin_151_Controller_Update(task_index, event->BaseVarIndex,  Settings.TaskDevicePluginConfig[event->TaskIndex][0], SENSOR_TYPE_SINGLE,0);
+                if(UserVar[event->BaseVarIndex] != duco_data[DUCO_DATA_FLOW]){
+                    UserVar[event->BaseVarIndex]   = duco_data[DUCO_DATA_FLOW]; // flow percentage
+                    Plugin_151_Controller_Update(task_index, event->BaseVarIndex,  Settings.TaskDevicePluginConfig[event->TaskIndex][PLUGIN_CONFIG_IDX_FLOW], SENSOR_TYPE_SINGLE,0);
                 }
 
-                if(UserVar[event->BaseVarIndex+1] != duco_data[1]){
-                    UserVar[event->BaseVarIndex+1]   = duco_data[1]; // flow percentage
-                    Plugin_151_Controller_Update(task_index, event->BaseVarIndex+1,   Settings.TaskDevicePluginConfig[event->TaskIndex][1], SENSOR_TYPE_SINGLE,0);
+                if(UserVar[event->BaseVarIndex+1] != duco_data[DUCO_DATA_STATUS]){
+                    UserVar[event->BaseVarIndex+1]   = duco_data[DUCO_DATA_STATUS]; // flow percentage
+                    Plugin_151_Controller_Update(task_index, event->BaseVarIndex+1,   Settings.TaskDevicePluginConfig[event->TaskIndex][PLUGIN_CONFIG_IDX_STATUS], SENSOR_TYPE_SINGLE,0);
                 }
 
-                if(UserVar[event->BaseVarIndex+2] != duco_data[2]){
-                    UserVar[event->BaseVarIndex+2]   = duco_data[2]; // flow percentage
-                    Plugin_151_Controller_Update(task_index, event->BaseVarIndex+2,  Settings.TaskDevicePluginConfig[event->TaskIndex][2], SENSOR_TYPE_SINGLE,0);
+                if(UserVar[event->BaseVarIndex+2] != duco_data[DUCO_DATA_CO2_PPM]){
+                    UserVar[event->BaseVarIndex+2]   = duco_data[DUCO_DATA_CO2_PPM]; // flow percentage
+                    Plugin_151_Controller_Update(task_index, event->BaseVarIndex+2,  Settings.TaskDevicePluginConfig[event->TaskIndex][PLUGIN_CONFIG_IDX_CO2_PPM], SENSOR_TYPE_SINGLE,0);
                 }
 
-                if(UserVar[event->BaseVarIndex+3] != duco_data[3]){
-                    UserVar[event->BaseVarIndex+3]   = duco_data[3]; // flow percentage
-                    Plugin_151_Controller_Update(task_index,event->BaseVarIndex+3,   Settings.TaskDevicePluginConfig[event->TaskIndex][3], SENSOR_TYPE_SINGLE,1);
+                if(UserVar[event->BaseVarIndex+3] != duco_data[DUCO_DATA_CO2_TEMP]){
+                    UserVar[event->BaseVarIndex+3]   = duco_data[DUCO_DATA_CO2_TEMP]; // CO2 temperature
+                    Plugin_151_Controller_Update(task_index,event->BaseVarIndex+3,   Settings.TaskDevicePluginConfig[event->TaskIndex][PLUGIN_CONFIG_IDX_CO2_TEMP], SENSOR_TYPE_SINGLE,1);
                 }
                 //sendData(event);
                 
@@ -443,7 +459,7 @@ float parseVentilationPercentage(){
             delay(20);
     */
 
-    unsigned int start_ventilation_byte = getValueByNodeNumberAndColumn( Settings.TaskDevicePluginConfig[task_index][4], ventilationPercentageColumnNumber); // ConfigLong[3] = ducobox node number
+    unsigned int start_ventilation_byte = getValueByNodeNumberAndColumn( Settings.TaskDevicePluginConfig[task_index][PLUGIN_CONFIG_DUCO_BOX_NODE], ventilationPercentageColumnNumber);
     /*
     String logstring5 = F("start_ventilation_byte: ");
     char lossebyte9[25];
@@ -524,7 +540,7 @@ int parseVentilationStatus(){
         return 0;
     }
 
-    unsigned int start_ducoboxstatus_byte = getValueByNodeNumberAndColumn( Settings.TaskDevicePluginConfig[task_index][4], ducoboxStatusColumnNumber); // ConfigLong[3] = ducobox node number
+    unsigned int start_ducoboxstatus_byte = getValueByNodeNumberAndColumn( Settings.TaskDevicePluginConfig[task_index][PLUGIN_CONFIG_DUCO_BOX_NODE], ducoboxStatusColumnNumber);
 
     if(start_ducoboxstatus_byte > 0){
         uint8_t ventilationStatus = 255;
@@ -547,7 +563,7 @@ int parseVentilationStatus(){
         }else{
             String logstring = F("[P151] DUCO SER GW: Status mode: " );
             //char lossebyte[6];
-            //sprintf_P(lossebyte, PSTR("%d "), (int)duco_data[1]);
+            //sprintf_P(lossebyte, PSTR("%d "), (int)duco_data[DUCO_DATA_STATUS]);
             logstring += ventilationStatus;
             addLog(LOG_LEVEL_DEBUG, logstring);
             return ventilationStatus;
@@ -563,7 +579,7 @@ float parseNodeTemperature(uint8_t nodeNumber){
         return 0;
     }
 
-    unsigned int start_CO2temp_byte = getValueByNodeNumberAndColumn( Settings.TaskDevicePluginConfig[task_index][5], tempColumnNumber); // TaskDevicePluginConfigLong[4] = CO2 controller node number
+    unsigned int start_CO2temp_byte = getValueByNodeNumberAndColumn( Settings.TaskDevicePluginConfig[task_index][PLUGIN_CONFIG_CO2_NODE], tempColumnNumber);
     uint8_t CO2temp_value_bytes[3];
 
         String logstring5 = F("[P151] DUCO SER GW: Start_CO2temp_byte: ");
@@ -626,9 +642,9 @@ void readNetworkList(){
             logArray(serial_buf, P151_bytes_read-1, 0);
 
             if(checkCommandInResponse(answerReadNetwork)){
-                duco_data[0] = parseVentilationPercentage(); // parse ventilation percentage from data
-                duco_data[1] = (float)parseVentilationStatus(); // parse ventilationstatus from data
-                duco_data[3] = parseNodeTemperature(CO2_NODE_NUMBER);
+                duco_data[DUCO_DATA_FLOW] = parseVentilationPercentage(); // parse ventilation percentage from data
+                duco_data[DUCO_DATA_STATUS] = (float)parseVentilationStatus(); // parse ventilationstatus from data
+                duco_data[DUCO_DATA_CO2_TEMP] = parseNodeTemperature(CO2_NODE_NUMBER);
 /*
                String logstring3 = F("Ducobox CO temp: ");
                char lossebyte3[10];
@@ -649,7 +665,7 @@ void readCO2PPM(){
 
     // SEND COMMAND: nodeparaget <Node> 74
     char command[20] = ""; /* 17 bytes + max 2 byte nodenumber + \r\n */
-    snprintf_P(command, sizeof(command), "nodeparaget %d 74\r\n", Settings.TaskDevicePluginConfig[task_index][5]);
+    snprintf_P(command, sizeof(command), "nodeparaget %d 74\r\n", Settings.TaskDevicePluginConfig[task_index][PLUGIN_CONFIG_CO2_NODE]);
     int commandSendResult = sendSerialCommand((byte*) command, strlen(command));
    
     // if succesfully send command then receive response
@@ -657,7 +673,7 @@ void readCO2PPM(){
         if(receiveSerialData()){
             if(checkCommandInResponse(answerReadNode)){
                 unsigned int temp_CO2PPM = parseCO2PPM();
-                duco_data[2] = temp_CO2PPM;
+                duco_data[DUCO_DATA_CO2_PPM] = temp_CO2PPM;
 
                 String logString = F("[P151] DUCO SER GW: CO2 PPM value = ");
                 char logData[10];
