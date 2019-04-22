@@ -501,12 +501,13 @@ float parseVentilationPercentage(){
         if( (temp_ventilation_value >= 0) && (temp_ventilation_value <= 100)){
             return (float)temp_ventilation_value;
         }else{
-            return 0;
             addLog(LOG_LEVEL_DEBUG, "[P151] DUCO SER GW: Ventilation value not between 0 and 100%. Ignore value.");
+            return 0;
         }
-    
     }
 
+    addLog(LOG_LEVEL_DEBUG, "[P151] DUCO SER GW: No ventilation value found.");
+    return 0;
 }
 
 
@@ -569,6 +570,8 @@ int parseVentilationStatus(){
             return ventilationStatus;
         }
     }
+
+    return 0;
 }
 
 /////////// READ CO2 temperture % ///////////
@@ -626,6 +629,7 @@ float parseNodeTemperature(uint8_t nodeNumber){
             return 0;
         }
     }
+    return 0;
 }
 
 
@@ -777,10 +781,10 @@ String logstring5 = F("[P151] DUCO SER GW: start_CO2_PPM_byte: ");
             return ((value[0] * 1000) + (value[1] * 100) + (value[2] * 10) + (value[3]));
         }
 
-    }else{
-        addLog(LOG_LEVEL_DEBUG, "[P151] DUCO SER GW: No CO2 PPM value found in package.");
-        return 0;
     }
+
+    addLog(LOG_LEVEL_DEBUG, "[P151] DUCO SER GW: No CO2 PPM value found in package.");
+    return 0;
 }
 
 
