@@ -23,9 +23,6 @@ boolean Plugin_151_init = false;
             String loggy;
 
 
-//18 bytes
-#define CMD_READ_NODE_SIZE 18
-uint8_t cmdReadNode[CMD_READ_NODE_SIZE] = { 0x4e , 0x6f , 0x64 , 0x65 , 0x50 , 0x61 , 0x72 , 0x61 , 0x47 , 0x65 , 0x74, 0x20, 0x32, 0x20, 0x37, 0x34, 0x0d, 0x0a};
 #define ANSWER_READ_NODE_SIZE 16
 uint8_t answerReadNode[ANSWER_READ_NODE_SIZE] = {0x6e, 0x6f , 0x64 , 0x65 , 0x70 , 0x61 , 0x72 , 0x61 , 0x67 , 0x65 , 0x74 , 0x20 , 0x32 , 0x20 , 0x37 , 0x34};
 
@@ -650,8 +647,10 @@ void readCO2PPM(){
 
     addLog(LOG_LEVEL_DEBUG, "[P151] DUCO SER GW: Start readCO2PPM");
 
-    // SEND COMMAND: nodeparaget 2 74
-    int commandSendResult = sendSerialCommand(cmdReadNode, CMD_READ_NODE_SIZE);
+    // SEND COMMAND: nodeparaget <Node> 74
+    char command[20] = ""; /* 17 bytes + max 2 byte nodenumber + \r\n */
+    snprintf_P(command, sizeof(command), "nodeparaget %d 74\r\n", Settings.TaskDevicePluginConfig[task_index][5]);
+    int commandSendResult = sendSerialCommand((byte*) command, strlen(command));
    
     // if succesfully send command then receive response
     if(commandSendResult){
@@ -671,10 +670,10 @@ void readCO2PPM(){
 }
 
 
-/* command: NodeParaGet 2 74
+/* command: NodeParaGet <Node> 74
 answer:
-.nodeparaget 2 74
-  Get PARA 74 of NODE 2
+.nodeparaget <Node> 74
+  Get PARA 74 of NODE <Node>
   --> 566
   Done
   */
