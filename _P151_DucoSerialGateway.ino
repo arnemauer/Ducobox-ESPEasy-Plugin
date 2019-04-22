@@ -129,7 +129,7 @@ boolean Plugin_151(byte function, struct EventStruct *event, String& string)
         addFormNumericBox(F("IDX Flow percentage"), F("Plugin_151_IDX1"), Settings.TaskDevicePluginConfig[event->TaskIndex][PLUGIN_CONFIG_IDX_FLOW], 0,5000);
         addFormNumericBox(F("IDX DUCOBOX status"), F("Plugin_151_IDX2"), Settings.TaskDevicePluginConfig[event->TaskIndex][PLUGIN_CONFIG_IDX_STATUS], 0,5000);
         addFormNumericBox(F("IDX CO2-sensor PPM"), F("Plugin_151_IDX3"), Settings.TaskDevicePluginConfig[event->TaskIndex][PLUGIN_CONFIG_IDX_CO2_PPM], 0,5000);
-        addFormNumericBox(F("IDX CO2-sensor temperture"), F("Plugin_151_IDX4"), Settings.TaskDevicePluginConfig[event->TaskIndex][PLUGIN_CONFIG_IDX_CO2_TEMP], 0, 5000);
+        addFormNumericBox(F("IDX CO2-sensor temperature"), F("Plugin_151_IDX4"), Settings.TaskDevicePluginConfig[event->TaskIndex][PLUGIN_CONFIG_IDX_CO2_TEMP], 0, 5000);
         addFormNumericBox(F("Ducobox nodenumber (default: 1)"), F("Plugin_151_ducobox_nodenumber"), Settings.TaskDevicePluginConfig[event->TaskIndex][PLUGIN_CONFIG_DUCO_BOX_NODE], 0,1000);
         addFormNumericBox(F("CO2 controller nodenumber"), F("Plugin_151_co2controller_nodenumber"), Settings.TaskDevicePluginConfig[event->TaskIndex][PLUGIN_CONFIG_CO2_NODE], 0,1000);
 
