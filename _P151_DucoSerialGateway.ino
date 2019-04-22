@@ -110,12 +110,12 @@ boolean Plugin_151(byte function, struct EventStruct *event, String& string)
       {
 
         addFormNote(F("For use with domoticz you can define an idx per value. If you use this you can ignore 'Send to Controller' below."));
-        addFormNumericBox(F("IDX Flow percentage:"), F("Plugin_151_IDX1"), Settings.TaskDevicePluginConfig[event->TaskIndex][0], 0,5000);
-        addFormNumericBox(F("IDX DUCOBOX status:"), F("Plugin_151_IDX2"), Settings.TaskDevicePluginConfig[event->TaskIndex][1], 0,5000);
-        addFormNumericBox(F("IDX CO2-sensor PPM:"), F("Plugin_151_IDX3"), Settings.TaskDevicePluginConfig[event->TaskIndex][2], 0,5000);
-        addFormNumericBox(F("IDX CO2-sensor temperture:"), F("Plugin_151_IDX4"), Settings.TaskDevicePluginConfig[event->TaskIndex][3], 0, 5000);
+        addFormNumericBox(F("IDX Flow percentage"), F("Plugin_151_IDX1"), Settings.TaskDevicePluginConfig[event->TaskIndex][0], 0,5000);
+        addFormNumericBox(F("IDX DUCOBOX status"), F("Plugin_151_IDX2"), Settings.TaskDevicePluginConfig[event->TaskIndex][1], 0,5000);
+        addFormNumericBox(F("IDX CO2-sensor PPM"), F("Plugin_151_IDX3"), Settings.TaskDevicePluginConfig[event->TaskIndex][2], 0,5000);
+        addFormNumericBox(F("IDX CO2-sensor temperture"), F("Plugin_151_IDX4"), Settings.TaskDevicePluginConfig[event->TaskIndex][3], 0, 5000);
         addFormNumericBox(F("Ducobox nodenumber (default: 1)"), F("Plugin_151_ducobox_nodenumber"), Settings.TaskDevicePluginConfig[event->TaskIndex][4], 0,1000);
-        addFormNumericBox(F("CO2 controller nodenumber:"), F("Plugin_151_co2controller_nodenumber"), Settings.TaskDevicePluginConfig[event->TaskIndex][5], 0,1000);
+        addFormNumericBox(F("CO2 controller nodenumber"), F("Plugin_151_co2controller_nodenumber"), Settings.TaskDevicePluginConfig[event->TaskIndex][5], 0,1000);
 
         success = true;
         break;
@@ -720,7 +720,7 @@ unsigned int parseCO2PPM(){
         }
     }
 
-String logstring5 = F("start_CO2_PPM_byte: ");
+String logstring5 = F("[P151] DUCO SER GW: start_CO2_PPM_byte: ");
         char lossebyte9[25];
         sprintf_P(lossebyte9, PSTR("%u"), CO2_start_byte);
         logstring5 += lossebyte9;
@@ -729,7 +729,7 @@ String logstring5 = F("start_CO2_PPM_byte: ");
  
  
         // logging
-        String logstring4 = F("co2 ppm valuebytes: ");
+        String logstring4 = F("[P151] DUCO SER GW: co2 ppm valuebytes: ");
         char lossebyte4[25];
         sprintf_P(lossebyte4, PSTR("raw = %02X %02X %02X "), serial_buf[CO2_start_byte],serial_buf[CO2_start_byte+1],serial_buf[CO2_start_byte+2]);
         logstring4 += lossebyte4;
