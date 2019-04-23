@@ -188,22 +188,22 @@ boolean Plugin_151(byte function, struct EventStruct *event, String& string)
 
                 if(UserVar[event->BaseVarIndex] != duco_data[DUCO_DATA_FLOW]){
                     UserVar[event->BaseVarIndex]   = duco_data[DUCO_DATA_FLOW]; // flow percentage
-                    Plugin_151_Controller_Update(task_index, event->BaseVarIndex,    PCONFIG(PLUGIN_CONFIG_IDX_FLOW), SENSOR_TYPE_SINGLE,0);
+                    Plugin_151_Controller_Update(task_index, event->BaseVarIndex, 0, PCONFIG(PLUGIN_CONFIG_IDX_FLOW), 0);
                 }
 
                 if(UserVar[event->BaseVarIndex+1] != duco_data[DUCO_DATA_STATUS]){
                     UserVar[event->BaseVarIndex+1]   = duco_data[DUCO_DATA_STATUS]; // flow percentage
-                    Plugin_151_Controller_Update(task_index, event->BaseVarIndex+1,  PCONFIG(PLUGIN_CONFIG_IDX_STATUS), SENSOR_TYPE_SINGLE,0);
+                    Plugin_151_Controller_Update(task_index, event->BaseVarIndex, 1, PCONFIG(PLUGIN_CONFIG_IDX_STATUS), 0);
                 }
 
                 if(UserVar[event->BaseVarIndex+2] != duco_data[DUCO_DATA_CO2_PPM]){
                     UserVar[event->BaseVarIndex+2]   = duco_data[DUCO_DATA_CO2_PPM]; // flow percentage
-                    Plugin_151_Controller_Update(task_index, event->BaseVarIndex+2,  PCONFIG(PLUGIN_CONFIG_IDX_CO2_PPM), SENSOR_TYPE_SINGLE,0);
+                    Plugin_151_Controller_Update(task_index, event->BaseVarIndex, 2, PCONFIG(PLUGIN_CONFIG_IDX_CO2_PPM), 0);
                 }
 
                 if(UserVar[event->BaseVarIndex+3] != duco_data[DUCO_DATA_CO2_TEMP]){
                     UserVar[event->BaseVarIndex+3]   = duco_data[DUCO_DATA_CO2_TEMP]; // CO2 temperature
-                    Plugin_151_Controller_Update(task_index, event->BaseVarIndex+3,  PCONFIG(PLUGIN_CONFIG_IDX_CO2_TEMP), SENSOR_TYPE_SINGLE,1);
+                    Plugin_151_Controller_Update(task_index, event->BaseVarIndex, 3, PCONFIG(PLUGIN_CONFIG_IDX_CO2_TEMP), 1);
                 }
                 //sendData(event);
                 
@@ -832,7 +832,7 @@ int logArray(uint8_t array[], int len, int fromByte) {
 
 // https://www.letscontrolit.com/forum/viewtopic.php?f=4&t=2104&p=9908&hilit=no+svalue#p9908
 
-void Plugin_151_Controller_Update(byte TaskIndex, byte BaseVarIndex, int IDX, byte SensorType, int valueDecimals)
+void Plugin_151_Controller_Update(byte TaskIndex, byte BaseVarIndex, byte relIndex, int IDX, int valueDecimals)
 {
 
     LoadTaskSettings(TaskIndex);   
@@ -843,24 +843,32 @@ void Plugin_151_Controller_Update(byte TaskIndex, byte BaseVarIndex, int IDX, by
     #define CONTROLLER_MAX 0
 #endif
 
-for (byte x=0; x < CONTROLLER_MAX; x++){
-  byte ControllerIndex = x;
+    for (byte x=0; x < CONTROLLER_MAX; x++){
+        byte ControllerIndex = x;
 
-if (Settings.ControllerEnabled[ControllerIndex] && Settings.Protocol[ControllerIndex])
-  {
-      byte ProtocolIndex = getProtocolIndex(Settings.Protocol[ControllerIndex]);
-      struct EventStruct TempEvent;
-      TempEvent.TaskIndex = TaskIndex;
-      TempEvent.ControllerIndex = ControllerIndex;
-      TempEvent.BaseVarIndex = BaseVarIndex; // ophogen per verzending.
-      TempEvent.idx = IDX;
-      TempEvent.sensorType = SensorType;
-      CPlugin_ptr[ProtocolIndex](CPLUGIN_PROTOCOL_SEND, &TempEvent, dummyString);
-      char log[30];
-            sprintf_P(log, PSTR("[P151] DUCO SER GW: Data sent to domoticz.") );
-            addLog(LOG_LEVEL_DEBUG,log);
+        if (Settings.ControllerEnabled[ControllerIndex] && Settings.Protocol[ControllerIndex])
+        {
+            byte ProtocolIndex = getProtocolIndex(Settings.Protocol[ControllerIndex]);
+            struct EventStruct TempEvent;
+            TempEvent.TaskIndex = TaskIndex;
+            TempEvent.ControllerIndex = ControllerIndex;
+            TempEvent.BaseVarIndex = BaseVarIndex + relIndex; // ophogen per verzending.
+            TempEvent.idx = IDX;
+            TempEvent.ProtocolIndex = ProtocolIndex;
+            TempEvent.sensorType = SENSOR_TYPE_SINGLE;
+
+            /*
+             * Controllers like domoticz HTTP do not use UserVar[BaseVarIndex + relIndex] but instead
+             * use UserVar[BaseVarIndex + 0] for SENSOR_TYPE_SINGLE; temporarily overwrite this value
+             * to make sure we send the correct sensor reading.
+             */
+            float oldValue = UserVar[BaseVarIndex];
+            UserVar[BaseVarIndex] = UserVar[BaseVarIndex + relIndex];
+            CPluginCall(TempEvent.ProtocolIndex, CPLUGIN_PROTOCOL_SEND, &TempEvent, dummyString);
+            UserVar[BaseVarIndex] = oldValue;
+
+            addLog(LOG_LEVEL_DEBUG, String("[P151] DUCO SER GW: Variable #") + (int) relIndex + " updated for controller " + (int)ControllerIndex);
+        }
     }
-  }
-
 }
 
