@@ -14,6 +14,7 @@
 #define PLUGIN_VALUENAME3_151   "CO2_PPM" // nodeparaget 2 74
 #define PLUGIN_VALUENAME4_151   "CO2_TEMP" // // networkcommand
 #define PLUGIN_READ_TIMEOUT_151   1200 // DUCOBOX askes "live" CO2 sensor info, so answer takes sometimes a second.
+#define PLUGIN_LOG_PREFIX_151   String("[P151] DUCO SER GW: ")
 
 #define DUCOBOX_NODE_NUMBER     1
 #define CO2_NODE_NUMBER         2
@@ -53,35 +54,26 @@ const uint8_t DucoStatusModes [13][5] =
    {23, 0x41, 0x55, 0x54, 0x33},   // 23 -> "aut3" = Boost30min;
    };
 
-// define buffers, large, indeed. The entire datagram checksum will be checked at once
-#define SERIAL_BUFFER_SIZE 750
-//#define NETBUF_SIZE 600
-uint8_t serial_buf[SERIAL_BUFFER_SIZE];
-unsigned int P151_bytes_read = 0;
 uint8_t task_index = 0;
 
 typedef enum {
-    DUCO_DATA_FLOW = 0,
-    DUCO_DATA_STATUS = 1,
-    DUCO_DATA_CO2_PPM = 2,
-    DUCO_DATA_CO2_TEMP = 3,
-    DUCO_DATA_LAST = 4,
-} DucoDataTypes;
-float duco_data[DUCO_DATA_LAST];
+    P151_DATA_FLOW = 0,
+    P151_DATA_STATUS = 1,
+    P151_DATA_CO2_PPM = 2,
+    P151_DATA_CO2_TEMP = 3,
+    P151_DATA_LAST = 4,
+} P151DucoDataTypes;
+float p151_duco_data[P151_DATA_LAST];
 
 typedef enum {
-    PLUGIN_CONFIG_IDX_FLOW = 0,
-    PLUGIN_CONFIG_IDX_STATUS = 1,
-    PLUGIN_CONFIG_IDX_CO2_PPM = 2,
-    PLUGIN_CONFIG_IDX_CO2_TEMP = 3,
-    PLUGIN_CONFIG_DUCO_BOX_NODE = 4,
-    PLUGIN_CONFIG_CO2_NODE = 5,
-    PLUGIN_CONFIG_LOG_SERIAL = 6,
-} PluginConfigs;
-
-int stopwordCounter = 0; // 0x0d 0x20 0x20 0x0d 0x3e 0x20
-unsigned int rows[15]; // byte number where a new row starts
-unsigned int rowCounter = 0;
+    P151_CONFIG_IDX_FLOW = 0,
+    P151_CONFIG_IDX_STATUS = 1,
+    P151_CONFIG_IDX_CO2_PPM = 2,
+    P151_CONFIG_IDX_CO2_TEMP = 3,
+    P151_CONFIG_DUCO_BOX_NODE = 4,
+    P151_CONFIG_CO2_NODE = 5,
+    P151_CONFIG_LOG_SERIAL = 6,
+} P151PluginConfigs;
 
 
 boolean Plugin_151(byte function, struct EventStruct *event, String& string)
@@ -127,13 +119,13 @@ boolean Plugin_151(byte function, struct EventStruct *event, String& string)
       {
 
         addFormNote(F("For use with domoticz you can define an idx per value. If you use this you can ignore 'Send to Controller' below."));
-        addFormNumericBox(F("IDX Flow percentage"), F("Plugin_151_IDX1"), PCONFIG(PLUGIN_CONFIG_IDX_FLOW), 0,5000);
-        addFormNumericBox(F("IDX DUCOBOX status"), F("Plugin_151_IDX2"), PCONFIG(PLUGIN_CONFIG_IDX_STATUS), 0,5000);
-        addFormNumericBox(F("IDX CO2-sensor PPM"), F("Plugin_151_IDX3"), PCONFIG(PLUGIN_CONFIG_IDX_CO2_PPM), 0,5000);
-        addFormNumericBox(F("IDX CO2-sensor temperature"), F("Plugin_151_IDX4"), PCONFIG(PLUGIN_CONFIG_IDX_CO2_TEMP), 0, 5000);
-        addFormNumericBox(F("Ducobox nodenumber (default: 1)"), F("Plugin_151_ducobox_nodenumber"), PCONFIG(PLUGIN_CONFIG_DUCO_BOX_NODE), 0,1000);
-        addFormNumericBox(F("CO2 controller nodenumber"), F("Plugin_151_co2controller_nodenumber"), PCONFIG(PLUGIN_CONFIG_CO2_NODE), 0,1000);
-        addFormCheckBox(F("Log serial messages to syslog"), F("Plugin151_log_serial"), PCONFIG(PLUGIN_CONFIG_LOG_SERIAL));
+        addFormNumericBox(F("IDX Flow percentage"), F("Plugin_151_IDX1"), PCONFIG(P151_CONFIG_IDX_FLOW), 0,5000);
+        addFormNumericBox(F("IDX DUCOBOX status"), F("Plugin_151_IDX2"), PCONFIG(P151_CONFIG_IDX_STATUS), 0,5000);
+        addFormNumericBox(F("IDX CO2-sensor PPM"), F("Plugin_151_IDX3"), PCONFIG(P151_CONFIG_IDX_CO2_PPM), 0,5000);
+        addFormNumericBox(F("IDX CO2-sensor temperature"), F("Plugin_151_IDX4"), PCONFIG(P151_CONFIG_IDX_CO2_TEMP), 0, 5000);
+        addFormNumericBox(F("Ducobox nodenumber (default: 1)"), F("Plugin_151_ducobox_nodenumber"), PCONFIG(P151_CONFIG_DUCO_BOX_NODE), 0,1000);
+        addFormNumericBox(F("CO2 controller nodenumber"), F("Plugin_151_co2controller_nodenumber"), PCONFIG(P151_CONFIG_CO2_NODE), 0,1000);
+        addFormCheckBox(F("Log serial messages to syslog"), F("Plugin151_log_serial"), PCONFIG(P151_CONFIG_LOG_SERIAL));
 
         success = true;
         break;
@@ -142,13 +134,13 @@ boolean Plugin_151(byte function, struct EventStruct *event, String& string)
     case PLUGIN_WEBFORM_SAVE:
       {
 
-        PCONFIG(PLUGIN_CONFIG_IDX_FLOW) = getFormItemInt(F("Plugin_151_IDX1"));
-        PCONFIG(PLUGIN_CONFIG_IDX_STATUS) = getFormItemInt(F("Plugin_151_IDX2"));
-        PCONFIG(PLUGIN_CONFIG_IDX_CO2_PPM) = getFormItemInt(F("Plugin_151_IDX3"));
-        PCONFIG(PLUGIN_CONFIG_IDX_CO2_TEMP) = getFormItemInt(F("Plugin_151_IDX4"));
-        PCONFIG(PLUGIN_CONFIG_DUCO_BOX_NODE) = getFormItemInt(F("Plugin_151_ducobox_nodenumber"));
-        PCONFIG(PLUGIN_CONFIG_CO2_NODE) = getFormItemInt(F("Plugin_151_co2controller_nodenumber"));
-        PCONFIG(PLUGIN_CONFIG_LOG_SERIAL) = isFormItemChecked(F("Plugin151_log_serial"));
+        PCONFIG(P151_CONFIG_IDX_FLOW) = getFormItemInt(F("Plugin_151_IDX1"));
+        PCONFIG(P151_CONFIG_IDX_STATUS) = getFormItemInt(F("Plugin_151_IDX2"));
+        PCONFIG(P151_CONFIG_IDX_CO2_PPM) = getFormItemInt(F("Plugin_151_IDX3"));
+        PCONFIG(P151_CONFIG_IDX_CO2_TEMP) = getFormItemInt(F("Plugin_151_IDX4"));
+        PCONFIG(P151_CONFIG_DUCO_BOX_NODE) = getFormItemInt(F("Plugin_151_ducobox_nodenumber"));
+        PCONFIG(P151_CONFIG_CO2_NODE) = getFormItemInt(F("Plugin_151_co2controller_nodenumber"));
+        PCONFIG(P151_CONFIG_LOG_SERIAL) = isFormItemChecked(F("Plugin151_log_serial"));
         success = true;
         break;
       }
@@ -159,10 +151,10 @@ boolean Plugin_151(byte function, struct EventStruct *event, String& string)
             Serial.begin(115200, SERIAL_8N1);
             Plugin_151_init = true;
 
-            duco_data[DUCO_DATA_FLOW] = 0; // flow %
-            duco_data[DUCO_DATA_STATUS] = 0; // DUCO_STATUS
-            duco_data[DUCO_DATA_CO2_PPM] = 0; // CO2 ppm
-            duco_data[DUCO_DATA_CO2_TEMP] = 0.0; // co2 temp
+            p151_duco_data[P151_DATA_FLOW] = 0; // flow %
+            p151_duco_data[P151_DATA_STATUS] = 0; // DUCO_STATUS
+            p151_duco_data[P151_DATA_CO2_PPM] = 0; // CO2 ppm
+            p151_duco_data[P151_DATA_CO2_TEMP] = 0.0; // co2 temp
 
             // temp woraround, ESP Easy framework does not currently prepare this...
             for (byte y = 0; y < TASKS_MAX; y++){
@@ -180,30 +172,30 @@ boolean Plugin_151(byte function, struct EventStruct *event, String& string)
       {
        
         if (Plugin_151_init){
-                addLog(LOG_LEVEL_DEBUG, "[P151] DUCO SER GW: read networkList");
+                addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_151 + "read networkList");
                 readNetworkList();
 
-                addLog(LOG_LEVEL_DEBUG, "[P151] DUCO SER GW: read CO2 PPM");
+                addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_151 + "read CO2 PPM");
                 readCO2PPM();                
 
-                if(UserVar[event->BaseVarIndex] != duco_data[DUCO_DATA_FLOW]){
-                    UserVar[event->BaseVarIndex]   = duco_data[DUCO_DATA_FLOW]; // flow percentage
-                    Plugin_151_Controller_Update(task_index, event->BaseVarIndex, 0, PCONFIG(PLUGIN_CONFIG_IDX_FLOW), 0);
+                if(UserVar[event->BaseVarIndex] != p151_duco_data[P151_DATA_FLOW]){
+                    UserVar[event->BaseVarIndex]   = p151_duco_data[P151_DATA_FLOW]; // flow percentage
+                    DucoSerialSendUpdate(PLUGIN_LOG_PREFIX_151, task_index, event->BaseVarIndex, 0, PCONFIG(P151_CONFIG_IDX_FLOW), 0);
                 }
 
-                if(UserVar[event->BaseVarIndex+1] != duco_data[DUCO_DATA_STATUS]){
-                    UserVar[event->BaseVarIndex+1]   = duco_data[DUCO_DATA_STATUS]; // flow percentage
-                    Plugin_151_Controller_Update(task_index, event->BaseVarIndex, 1, PCONFIG(PLUGIN_CONFIG_IDX_STATUS), 0);
+                if(UserVar[event->BaseVarIndex+1] != p151_duco_data[P151_DATA_STATUS]){
+                    UserVar[event->BaseVarIndex+1]   = p151_duco_data[P151_DATA_STATUS]; // flow percentage
+                    DucoSerialSendUpdate(PLUGIN_LOG_PREFIX_151, task_index, event->BaseVarIndex, 1, PCONFIG(P151_CONFIG_IDX_STATUS), 0);
                 }
 
-                if(UserVar[event->BaseVarIndex+2] != duco_data[DUCO_DATA_CO2_PPM]){
-                    UserVar[event->BaseVarIndex+2]   = duco_data[DUCO_DATA_CO2_PPM]; // flow percentage
-                    Plugin_151_Controller_Update(task_index, event->BaseVarIndex, 2, PCONFIG(PLUGIN_CONFIG_IDX_CO2_PPM), 0);
+                if(UserVar[event->BaseVarIndex+2] != p151_duco_data[P151_DATA_CO2_PPM]){
+                    UserVar[event->BaseVarIndex+2]   = p151_duco_data[P151_DATA_CO2_PPM]; // flow percentage
+                    DucoSerialSendUpdate(PLUGIN_LOG_PREFIX_151, task_index, event->BaseVarIndex, 2, PCONFIG(P151_CONFIG_IDX_CO2_PPM), 0);
                 }
 
-                if(UserVar[event->BaseVarIndex+3] != duco_data[DUCO_DATA_CO2_TEMP]){
-                    UserVar[event->BaseVarIndex+3]   = duco_data[DUCO_DATA_CO2_TEMP]; // CO2 temperature
-                    Plugin_151_Controller_Update(task_index, event->BaseVarIndex, 3, PCONFIG(PLUGIN_CONFIG_IDX_CO2_TEMP), 1);
+                if(UserVar[event->BaseVarIndex+3] != p151_duco_data[P151_DATA_CO2_TEMP]){
+                    UserVar[event->BaseVarIndex+3]   = p151_duco_data[P151_DATA_CO2_TEMP]; // CO2 temperature
+                    DucoSerialSendUpdate(PLUGIN_LOG_PREFIX_151, task_index, event->BaseVarIndex, 3, PCONFIG(P151_CONFIG_IDX_CO2_TEMP), 1);
                 }
                 //sendData(event);
                 
@@ -238,17 +230,17 @@ unsigned int getColumnNumberByColumnName(uint8_t columnName[]){
 
 
     // loop through all characters of row 3 (row with columnnames)
-    for (int j = rows[currentRow]; j <= rows[currentRow+1]; j++) {
-        if(serial_buf[j] == 0x7C){
+    for (int j = duco_serial_rows[currentRow]; j <= duco_serial_rows[currentRow+1]; j++) {
+        if(duco_serial_buf[j] == 0x7C){
             separatorCounter++;
 
             // check if our current position + the columnname isn't exceeding the total characters of the row 
-            if(j+charCount <= rows[currentRow+1]){
+            if(j+charCount <= duco_serial_rows[currentRow+1]){
                 // after each separator start checking if the column name matches
                 for(int charNr = 0; charNr < charCount; charNr++ ){ // loop through every character of the columnname till all characters are matched
-                    if(serial_buf[j+1+charNr] == columnName[charNr]){
+                    if(duco_serial_buf[j+1+charNr] == columnName[charNr]){
 
-                        sprintf_P(lossebyte, PSTR("%c "), serial_buf[j+1+charNr]);
+                        sprintf_P(lossebyte, PSTR("%c "), duco_serial_buf[j+1+charNr]);
                         loggy += lossebyte;
                         loggy += F("-");
                         sprintf_P(lossebyte, PSTR("%c "), columnName[charNr]);
@@ -272,7 +264,7 @@ unsigned int getColumnNumberByColumnName(uint8_t columnName[]){
                     }
                 }
             }
-        } // end of if(serial_buf[j] == 0x7C){
+        } // end of if(duco_serial_buf[j] == 0x7C){
     }
 
 return 9999;
@@ -284,17 +276,17 @@ unsigned int getValueByNodeNumberAndColumn(uint8_t ducoNodeNumber,uint8_t ducoCo
     unsigned int start_byte_number = 0;
     unsigned int end_byte_number = 0;
     unsigned int row_number;
-    for (int currentRow = 4; currentRow <= rowCounter; currentRow++) {
+    for (int currentRow = 4; currentRow <= duco_serial_rowCounter; currentRow++) {
         unsigned int number_size = 0;
         unsigned int row_node_number = 0;
 
         for (int j = 0; j <= 6; j++) {
-            if( serial_buf[ rows[currentRow]+j ] != 0x20){
-                if(serial_buf[ rows[currentRow]+j ] >= '0' && serial_buf[ rows[currentRow]+j ] <= '9'){
+            if( duco_serial_buf[ duco_serial_rows[currentRow]+j ] != 0x20){
+                if(duco_serial_buf[ duco_serial_rows[currentRow]+j ] >= '0' && duco_serial_buf[ duco_serial_rows[currentRow]+j ] <= '9'){
                     if(number_size > 0){
-                        row_node_number = row_node_number + (( serial_buf[ rows[currentRow]+j ] - '0' ) * (10 * number_size)) ;
+                        row_node_number = row_node_number + (( duco_serial_buf[ duco_serial_rows[currentRow]+j ] - '0' ) * (10 * number_size)) ;
                     }else{
-                        row_node_number = row_node_number + ( serial_buf[ rows[currentRow]+j ] - '0' );
+                        row_node_number = row_node_number + ( duco_serial_buf[ duco_serial_rows[currentRow]+j ] - '0' );
                         number_size++;
                     }
                 }
@@ -303,8 +295,8 @@ unsigned int getValueByNodeNumberAndColumn(uint8_t ducoNodeNumber,uint8_t ducoCo
 
 
         if(row_node_number == ducoNodeNumber){
-            start_byte_number = rows[currentRow]; //rows[k] == startbyte of row with device id
-            end_byte_number   = rows[currentRow+1];
+            start_byte_number = duco_serial_rows[currentRow]; //duco_serial_rows[k] == startbyte of row with device id
+            end_byte_number   = duco_serial_rows[currentRow+1];
             //row_number        = k;
             break;
         }
@@ -312,8 +304,8 @@ unsigned int getValueByNodeNumberAndColumn(uint8_t ducoNodeNumber,uint8_t ducoCo
 
     if(start_byte_number > 0){
         unsigned int column_counter = 0;
-        for (int i = start_byte_number; i <= end_byte_number; i++) { // smaller then P151_bytes_read OR... the next row start?
-            if(serial_buf[i] == 0x7c){
+        for (int i = start_byte_number; i <= end_byte_number; i++) { // smaller then duco_serial_bytes_read OR... the next row start?
+            if(duco_serial_buf[i] == 0x7c){
                 column_counter++;
                 if(column_counter >= ducoColumnNumber){
                     return i+1;
@@ -324,115 +316,6 @@ unsigned int getValueByNodeNumberAndColumn(uint8_t ducoNodeNumber,uint8_t ducoCo
     }
     return 0;
 }
-
-int sendSerialCommand(byte command[], int size){
-    bool error=false;
-
-    // DUCO throws random debug info on the serial, lets flush input buffer.
-    serialFlush();
-
-    for (int m = 0; m <= size-1; m++) {
-       delay(10); // 20ms = buffer overrun while reading serial data. // ducosoftware uses +-15ms.
-       int bytesSend = Serial.write(command[m]);
-       if(bytesSend != 1){
-           error=true;
-           break;
-        }
-    } // end of forloop
-
-    // if error: log, clear command and flush buffer!
-    if(error){
-        addLog(LOG_LEVEL_ERROR, "[P151] DUCO SER GW: Error, failed sending command. Clear command and buffer");
-
-        // press "enter" to clear send bytes.
-        Serial.write(0x0d);
-        delay(20);
-        Serial.write(0x0a);
-
-       serialFlush();
-        return false;
-
-    }else{
-        addLog(LOG_LEVEL_DEBUG, "[P151] DUCO SER GW: Send command successfull!");
-        return true;
-    }
-} // end of sendSerialCommand
-
-
-void serialFlush(){
-   // empty buffer
-        long start = millis();
-        while ((millis() - start) < 200) {
-            while(Serial.available() > 0){
-                Serial.read();
-            }
-        }
-}  
-
-
-bool receiveSerialData(){
-    long start = millis();
-    stopwordCounter = 0;
-    P151_bytes_read = 0; // reset bytes read counter
-    rows[0] = 0; // row zero = command in answer from duco
-    rowCounter = 1; 
-
-    // Handle RESPONSE, read serial till we received the stopword or a timeout occured.
-    while (((millis() - start) < PLUGIN_READ_TIMEOUT_151) && (stopwordCounter < 6)) {
-        if (Serial.available() > 0) {
-            serial_buf[P151_bytes_read] = Serial.read();
-
-            // check if there is a new row, 0x0d = new row.
-            if(serial_buf[P151_bytes_read] == 0x0d){
-                rows[rowCounter] = P151_bytes_read;
-                rowCounter++;
-            }
-
-            if ((serial_buf[P151_bytes_read] == 0x0d) || (serial_buf[P151_bytes_read] == 0x20) || (serial_buf[P151_bytes_read] == 0x3e)) {
-                stopwordCounter++; // character of stopwoord found 
-            }else{
-                stopwordCounter = 0;
-            }            
-            P151_bytes_read++;
-        }
-
-    }// end while
-
-    if(stopwordCounter == 6){
-        logSerial(LOG_LEVEL_INFO, "[P151] DUCO SER GW: Package received with stopword.");
-        return true;
-    }else{
-        // timout occurred, stopword not found!
-        logSerial(LOG_LEVEL_INFO, "[P151] DUCO SER GW: Package receive timeout.");
-        serialFlush();
-        return false;
-    }
-
-}
-
-
-bool checkCommandInResponse(uint8_t command[]){
-    // Ducobox returns the command, lets check if the command matches 
-    bool commandReceived = false;
-
-    for (int j = 0; j <= (sizeof(command) / sizeof(uint8_t)  ); j++) {
-            
-        if(serial_buf[j] == command[j]){
-            commandReceived = true;
-        }else{
-            commandReceived = false;
-            break;
-        }
-    }
-
-    if(commandReceived == true){
-        logSerial(LOG_LEVEL_DEBUG, "[P151] DUCO SER GW: Exptected command received.");
-    }else{
-        logSerial(LOG_LEVEL_DEBUG, "[P151] DUCO SER GW: Unexpected command received.");
-    }
-    return commandReceived;
-}
-
 
     // DUCOBOX prints a device list; lets find the startbyte of each row.
     // row 0 = ".network" (command of response
@@ -462,7 +345,7 @@ float parseVentilationPercentage(){
             delay(20);
     */
 
-    unsigned int start_ventilation_byte = getValueByNodeNumberAndColumn( Settings.TaskDevicePluginConfig[task_index][PLUGIN_CONFIG_DUCO_BOX_NODE], ventilationPercentageColumnNumber);
+    unsigned int start_ventilation_byte = getValueByNodeNumberAndColumn( Settings.TaskDevicePluginConfig[task_index][P151_CONFIG_DUCO_BOX_NODE], ventilationPercentageColumnNumber);
     /*
     String logstring5 = F("start_ventilation_byte: ");
     char lossebyte9[25];
@@ -475,11 +358,11 @@ float parseVentilationPercentage(){
         unsigned int number_size = 0;
         unsigned int ventilation_value_bytes[3];
         for (int j = 0; j <= 3; j++) {
-            if( (serial_buf[start_ventilation_byte+j] == 0x20) || (serial_buf[start_ventilation_byte+j] == 0x7C) ){ // 0x20 is spatie achter het getal, 0x7c is einde value, negeren!
+            if( (duco_serial_buf[start_ventilation_byte+j] == 0x20) || (duco_serial_buf[start_ventilation_byte+j] == 0x7C) ){ // 0x20 is spatie achter het getal, 0x7c is einde value, negeren!
                 number_size = j-1;
                 break;
-            }else if (serial_buf[start_ventilation_byte+j] >= '0' && serial_buf[start_ventilation_byte+j] <= '9'){
-                ventilation_value_bytes[j] = serial_buf[start_ventilation_byte+j] - '0';
+            }else if (duco_serial_buf[start_ventilation_byte+j] >= '0' && duco_serial_buf[start_ventilation_byte+j] <= '9'){
+                ventilation_value_bytes[j] = duco_serial_buf[start_ventilation_byte+j] - '0';
             }else{
                 ventilation_value_bytes[j] = 0;
             }
@@ -488,7 +371,7 @@ float parseVentilationPercentage(){
         if (serialLoggingEnabled()) {
             String logstring4 = F("Ventilation valuebytes: ");
             char lossebyte4[25];
-            sprintf_P(lossebyte4, PSTR("%02X %02X %02X sizenr %u"), serial_buf[start_ventilation_byte],serial_buf[start_ventilation_byte+1],serial_buf[start_ventilation_byte+2],number_size);
+            sprintf_P(lossebyte4, PSTR("%02X %02X %02X sizenr %u"), duco_serial_buf[start_ventilation_byte],duco_serial_buf[start_ventilation_byte+1],duco_serial_buf[start_ventilation_byte+2],number_size);
             logstring4 += lossebyte4;
             addLog(LOG_LEVEL_DEBUG, logstring4);
             delay(20);
@@ -505,12 +388,12 @@ float parseVentilationPercentage(){
         if( (temp_ventilation_value >= 0) && (temp_ventilation_value <= 100)){
             return (float)temp_ventilation_value;
         }else{
-            addLog(LOG_LEVEL_DEBUG, "[P151] DUCO SER GW: Ventilation value not between 0 and 100%. Ignore value.");
+            addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_151 + "Ventilation value not between 0 and 100%. Ignore value.");
             return 0;
         }
     }
 
-    addLog(LOG_LEVEL_DEBUG, "[P151] DUCO SER GW: No ventilation value found.");
+    addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_151 + "No ventilation value found.");
     return 0;
 }
 
@@ -545,14 +428,14 @@ int parseVentilationStatus(){
         return 0;
     }
 
-    unsigned int start_ducoboxstatus_byte = getValueByNodeNumberAndColumn( Settings.TaskDevicePluginConfig[task_index][PLUGIN_CONFIG_DUCO_BOX_NODE], ducoboxStatusColumnNumber);
+    unsigned int start_ducoboxstatus_byte = getValueByNodeNumberAndColumn( Settings.TaskDevicePluginConfig[task_index][P151_CONFIG_DUCO_BOX_NODE], ducoboxStatusColumnNumber);
 
     if(start_ducoboxstatus_byte > 0){
         uint8_t ventilationStatus = 255;
 
         for (int j = 0; j <= 13; j++) {
             for (int byteNumber = 0; byteNumber <= 3; byteNumber++) {
-                if(serial_buf[ (start_ducoboxstatus_byte + byteNumber )] == DucoStatusModes[j][ (byteNumber + 1) ]){
+                if(duco_serial_buf[ (start_ducoboxstatus_byte + byteNumber )] == DucoStatusModes[j][ (byteNumber + 1) ]){
                     if(byteNumber == 3){
                         ventilationStatus = DucoStatusModes[j][0];
                     }
@@ -564,11 +447,11 @@ int parseVentilationStatus(){
         }
 
         if(ventilationStatus == 255){
-            addLog(LOG_LEVEL_DEBUG, "[P151] DUCO SER GW: Status not available.");
+            addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_151 + "Status not available.");
         }else{
-            String logstring = F("[P151] DUCO SER GW: Status mode: " );
+            String logstring = PLUGIN_LOG_PREFIX_151 + F("Status mode: " );
             //char lossebyte[6];
-            //sprintf_P(lossebyte, PSTR("%d "), (int)duco_data[DUCO_DATA_STATUS]);
+            //sprintf_P(lossebyte, PSTR("%d "), (int)p151_duco_data[P151_DATA_STATUS]);
             logstring += ventilationStatus;
             addLog(LOG_LEVEL_DEBUG, logstring);
             return ventilationStatus;
@@ -586,11 +469,11 @@ float parseNodeTemperature(uint8_t nodeNumber){
         return 0;
     }
 
-    unsigned int start_CO2temp_byte = getValueByNodeNumberAndColumn( Settings.TaskDevicePluginConfig[task_index][PLUGIN_CONFIG_CO2_NODE], tempColumnNumber);
+    unsigned int start_CO2temp_byte = getValueByNodeNumberAndColumn( Settings.TaskDevicePluginConfig[task_index][P151_CONFIG_CO2_NODE], tempColumnNumber);
     uint8_t CO2temp_value_bytes[3];
 
     if (serialLoggingEnabled()) {
-        String logstring5 = F("[P151] DUCO SER GW: Start_CO2temp_byte: ");
+        String logstring5 = PLUGIN_LOG_PREFIX_151 + F("Start_CO2temp_byte: ");
         char lossebyte9[25];
         sprintf_P(lossebyte9, PSTR("%u"), start_CO2temp_byte);
         logstring5 += lossebyte9;
@@ -601,19 +484,19 @@ float parseNodeTemperature(uint8_t nodeNumber){
 
     if(start_CO2temp_byte > 0){
         for (int j = 0; j <= 3-1; j++) {
-            if(serial_buf[start_CO2temp_byte+j] == 0x20){ // 0d is punt achter het getal, negeren!
+            if(duco_serial_buf[start_CO2temp_byte+j] == 0x20){ // 0d is punt achter het getal, negeren!
                 CO2temp_value_bytes[j] = 0;
-            }else if (serial_buf[start_CO2temp_byte+j] >= '0' && serial_buf[start_CO2temp_byte+j] <= '9'){
-                CO2temp_value_bytes[j] = serial_buf[start_CO2temp_byte+j] - '0';
+            }else if (duco_serial_buf[start_CO2temp_byte+j] >= '0' && duco_serial_buf[start_CO2temp_byte+j] <= '9'){
+                CO2temp_value_bytes[j] = duco_serial_buf[start_CO2temp_byte+j] - '0';
             }else{
                 CO2temp_value_bytes[j] = 0;
             }
         }
 
         if (serialLoggingEnabled()) {
-            String logstring4 = F("[P151] DUCO SER GW: co2 temp valuebytes: ");
+            String logstring4 = PLUGIN_LOG_PREFIX_151 + F("co2 temp valuebytes: ");
             char lossebyte4[25];
-            sprintf_P(lossebyte4, PSTR("raw = %02X %02X %02X "), serial_buf[start_CO2temp_byte],serial_buf[start_CO2temp_byte+1],serial_buf[start_CO2temp_byte+2]);
+            sprintf_P(lossebyte4, PSTR("raw = %02X %02X %02X "), duco_serial_buf[start_CO2temp_byte],duco_serial_buf[start_CO2temp_byte+1],duco_serial_buf[start_CO2temp_byte+2]);
             logstring4 += lossebyte4;
             sprintf_P(lossebyte4, PSTR("%02X %02X %02X "), CO2temp_value_bytes[0],CO2temp_value_bytes[1],CO2temp_value_bytes[2]);
             logstring4 += lossebyte4;
@@ -630,7 +513,7 @@ float parseNodeTemperature(uint8_t nodeNumber){
         if (temp_CO2_temp_value >= 0 && temp_CO2_temp_value <= 50){ // between
             return temp_CO2_temp_value;
         }else{
-            addLog(LOG_LEVEL_DEBUG, "[P151] DUCO SER GW: CO2 temp value not between 0 and 50 degrees celsius. Ignoring value.");
+            addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_151 + "CO2 temp value not between 0 and 50 degrees celsius. Ignoring value.");
             return 0;
         }
     }
@@ -640,20 +523,20 @@ float parseNodeTemperature(uint8_t nodeNumber){
 
 // read CO2 temp, ventilation %, DUCO status
 void readNetworkList(){
-    addLog(LOG_LEVEL_DEBUG, "[P151] DUCO SER GW: start readNetworkList");
+    addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_151 + "start readNetworkList");
 
     // SEND COMMAND
-    bool commandSendResult = sendSerialCommand(cmdReadNetwork, CMD_READ_NETWORK_SIZE);
+    bool commandSendResult = DucoSerialSendCommand(PLUGIN_LOG_PREFIX_151, cmdReadNetwork, CMD_READ_NETWORK_SIZE);
 
     // if succesfully send command then receive response
     if(commandSendResult){
-        if(receiveSerialData()){
-            logArray(serial_buf, P151_bytes_read-1, 0);
+        if(DucoSerialReceiveData(PLUGIN_LOG_PREFIX_151, PLUGIN_READ_TIMEOUT_151, serialLoggingEnabled())){
+            logArray(duco_serial_buf, duco_serial_bytes_read-1, 0);
 
-            if(checkCommandInResponse(answerReadNetwork)){
-                duco_data[DUCO_DATA_FLOW] = parseVentilationPercentage(); // parse ventilation percentage from data
-                duco_data[DUCO_DATA_STATUS] = (float)parseVentilationStatus(); // parse ventilationstatus from data
-                duco_data[DUCO_DATA_CO2_TEMP] = parseNodeTemperature(CO2_NODE_NUMBER);
+            if(DucoSerialCheckCommandInResponse(PLUGIN_LOG_PREFIX_151, answerReadNetwork, serialLoggingEnabled())){
+                p151_duco_data[P151_DATA_FLOW] = parseVentilationPercentage(); // parse ventilation percentage from data
+                p151_duco_data[P151_DATA_STATUS] = (float)parseVentilationStatus(); // parse ventilationstatus from data
+                p151_duco_data[P151_DATA_CO2_TEMP] = parseNodeTemperature(CO2_NODE_NUMBER);
 /*
                String logstring3 = F("Ducobox CO temp: ");
                char lossebyte3[10];
@@ -670,21 +553,21 @@ void readNetworkList(){
 
 void readCO2PPM(){
 
-    addLog(LOG_LEVEL_DEBUG, "[P151] DUCO SER GW: Start readCO2PPM");
+    addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_151 + "Start readCO2PPM");
 
     // SEND COMMAND: nodeparaget <Node> 74
     char command[20] = ""; /* 17 bytes + max 2 byte nodenumber + \r\n */
-    snprintf_P(command, sizeof(command), "nodeparaget %d 74\r\n", Settings.TaskDevicePluginConfig[task_index][PLUGIN_CONFIG_CO2_NODE]);
-    int commandSendResult = sendSerialCommand((byte*) command, strlen(command));
+    snprintf_P(command, sizeof(command), "nodeparaget %d 74\r\n", Settings.TaskDevicePluginConfig[task_index][P151_CONFIG_CO2_NODE]);
+    int commandSendResult = DucoSerialSendCommand(PLUGIN_LOG_PREFIX_151, (byte*) command, strlen(command));
    
     // if succesfully send command then receive response
     if(commandSendResult){
-        if(receiveSerialData()){
-            if(checkCommandInResponse(answerReadNode)){
+        if(DucoSerialReceiveData(PLUGIN_LOG_PREFIX_151, PLUGIN_READ_TIMEOUT_151, serialLoggingEnabled())){
+            if(DucoSerialCheckCommandInResponse(PLUGIN_LOG_PREFIX_151, answerReadNode, serialLoggingEnabled())){
                 unsigned int temp_CO2PPM = parseCO2PPM();
-                duco_data[DUCO_DATA_CO2_PPM] = temp_CO2PPM;
+                p151_duco_data[P151_DATA_CO2_PPM] = temp_CO2PPM;
 
-                String logString = F("[P151] DUCO SER GW: CO2 PPM value = ");
+                String logString = PLUGIN_LOG_PREFIX_151 + F("CO2 PPM value = ");
                 char logData[10];
                 sprintf_P(logData, PSTR("%u"), temp_CO2PPM);
                 logString += logData;
@@ -709,7 +592,7 @@ unsigned int parseCO2PPM(){
    String logstring3 = F("SER BYTES: ");
         char lossebyte3[10];
 
-            sprintf_P(lossebyte3, PSTR("%u "), P151_bytes_read);
+            sprintf_P(lossebyte3, PSTR("%u "), duco_serial_bytes_read);
             logstring3 += lossebyte3;
 
             addLog(LOG_LEVEL_INFO, logstring3);
@@ -717,11 +600,11 @@ unsigned int parseCO2PPM(){
 
             logstring3 = F("Received serial data: ");
 
-        for (int jj = 0; jj <= P151_bytes_read; jj++) {
-            sprintf_P(lossebyte3, PSTR("%X "), serial_buf[jj]);
+        for (int jj = 0; jj <= duco_serial_bytes_read; jj++) {
+            sprintf_P(lossebyte3, PSTR("%X "), duco_serial_buf[jj]);
             logstring3 += lossebyte3;
 
-            /*if(debugCounter == 30 || j == P151_bytes_read){
+            /*if(debugCounter == 30 || j == duco_serial_bytes_read){
                 debugCounter = 0;
                 addLog(LOG_LEVEL_INFO, logstring3);
                 delay(10);
@@ -733,11 +616,11 @@ unsigned int parseCO2PPM(){
 */
 
     // CO2 value is after this 4 bytes: 2d 2d 3e 20 = "--> ", loop through data to find this bytes
-    for (int i = 0; i <= P151_bytes_read-1; i++) {
-        if(serial_buf[i] == 0x2d){
-            if(serial_buf[i+1] == 0x2d && serial_buf[i+2] == 0x3e && serial_buf[i+3] == 0x20){ 
+    for (int i = 0; i <= duco_serial_bytes_read-1; i++) {
+        if(duco_serial_buf[i] == 0x2d){
+            if(duco_serial_buf[i+1] == 0x2d && duco_serial_buf[i+2] == 0x3e && duco_serial_buf[i+3] == 0x20){ 
                 // if ducobox failes to receive current co2 ppm than it says failed (66 61 69 6c 65 64).
-                if (serial_buf[i+4] >= '0' && serial_buf[i+4] <= '9'){
+                if (duco_serial_buf[i+4] >= '0' && duco_serial_buf[i+4] <= '9'){
                 // the first byte is a valid number...
                     CO2_start_byte = i+4;
                 }
@@ -746,16 +629,16 @@ unsigned int parseCO2PPM(){
     }
 
     if (serialLoggingEnabled()) {
-        String logstring5 = F("[P151] DUCO SER GW: start_CO2_PPM_byte: ");
+        String logstring5 = PLUGIN_LOG_PREFIX_151 + F("start_CO2_PPM_byte: ");
         char lossebyte9[25];
         sprintf_P(lossebyte9, PSTR("%u"), CO2_start_byte);
         logstring5 += lossebyte9;
         addLog(LOG_LEVEL_DEBUG, logstring5);
         delay(20);
  
-        String logstring4 = F("[P151] DUCO SER GW: co2 ppm valuebytes: ");
+        String logstring4 = PLUGIN_LOG_PREFIX_151 + F("co2 ppm valuebytes: ");
         char lossebyte4[25];
-        sprintf_P(lossebyte4, PSTR("raw = %02X %02X %02X "), serial_buf[CO2_start_byte],serial_buf[CO2_start_byte+1],serial_buf[CO2_start_byte+2]);
+        sprintf_P(lossebyte4, PSTR("raw = %02X %02X %02X "), duco_serial_buf[CO2_start_byte],duco_serial_buf[CO2_start_byte+1],duco_serial_buf[CO2_start_byte+2]);
         logstring4 += lossebyte4;
         
         addLog(LOG_LEVEL_DEBUG, logstring4);
@@ -766,11 +649,11 @@ unsigned int parseCO2PPM(){
         uint8_t value[4];
         unsigned int number_size = 0;
         for (int j = 0; j <= 4; j++) {
-            if(serial_buf[CO2_start_byte+j] == 0x0d){ // 0x0d = Carriage Return (next line), determine size of numbers
+            if(duco_serial_buf[CO2_start_byte+j] == 0x0d){ // 0x0d = Carriage Return (next line), determine size of numbers
                 number_size = j-1;
                 break;
-            }else if (serial_buf[CO2_start_byte+j] >= '0' && serial_buf[CO2_start_byte+j] <= '9'){ // check if number is valid ascii character
-                value[j] = serial_buf[CO2_start_byte+j] - '0'; // convert ascii to int
+            }else if (duco_serial_buf[CO2_start_byte+j] >= '0' && duco_serial_buf[CO2_start_byte+j] <= '9'){ // check if number is valid ascii character
+                value[j] = duco_serial_buf[CO2_start_byte+j] - '0'; // convert ascii to int
             }else{
                 value[j] = 0; // invalid ascii character, ignore byte
             }
@@ -788,18 +671,12 @@ unsigned int parseCO2PPM(){
 
     }
 
-    addLog(LOG_LEVEL_DEBUG, "[P151] DUCO SER GW: No CO2 PPM value found in package.");
+    addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_151 + "No CO2 PPM value found in package.");
     return 0;
 }
 
 bool serialLoggingEnabled() {
-    return Settings.TaskDevicePluginConfig[task_index][PLUGIN_CONFIG_LOG_SERIAL] == 1;
-}
-
-void logSerial(int level, const char *message) {
-    if (serialLoggingEnabled()) {
-        addLog(level, message);
-    }
+    return Settings.TaskDevicePluginConfig[task_index][P151_CONFIG_LOG_SERIAL] == 1;
 }
 
 int logArray(uint8_t array[], int len, int fromByte) {
@@ -809,7 +686,7 @@ int logArray(uint8_t array[], int len, int fromByte) {
 
     unsigned int counter= 1;
 
-    String logstring = F("[P151] DUCO SER GW: Pakket ontvangen: ");
+    String logstring = PLUGIN_LOG_PREFIX_151 + F("Pakket ontvangen: ");
     char lossebyte[6];
 
     for (int i = fromByte; i <= len-1; i++) {
@@ -828,47 +705,3 @@ int logArray(uint8_t array[], int len, int fromByte) {
     addLog(LOG_LEVEL_INFO,logstring);
     return -1;
 }
-
-
-// https://www.letscontrolit.com/forum/viewtopic.php?f=4&t=2104&p=9908&hilit=no+svalue#p9908
-
-void Plugin_151_Controller_Update(byte TaskIndex, byte BaseVarIndex, byte relIndex, int IDX, int valueDecimals)
-{
-
-    LoadTaskSettings(TaskIndex);   
-    ExtraTaskSettings.TaskDeviceValueDecimals[0] = valueDecimals;
-
-// backward compatibility for version 148 and lower...
-#if defined(BUILD) && BUILD <= 150
-    #define CONTROLLER_MAX 0
-#endif
-
-    for (byte x=0; x < CONTROLLER_MAX; x++){
-        byte ControllerIndex = x;
-
-        if (Settings.ControllerEnabled[ControllerIndex] && Settings.Protocol[ControllerIndex])
-        {
-            byte ProtocolIndex = getProtocolIndex(Settings.Protocol[ControllerIndex]);
-            struct EventStruct TempEvent;
-            TempEvent.TaskIndex = TaskIndex;
-            TempEvent.ControllerIndex = ControllerIndex;
-            TempEvent.BaseVarIndex = BaseVarIndex + relIndex; // ophogen per verzending.
-            TempEvent.idx = IDX;
-            TempEvent.ProtocolIndex = ProtocolIndex;
-            TempEvent.sensorType = SENSOR_TYPE_SINGLE;
-
-            /*
-             * Controllers like domoticz HTTP do not use UserVar[BaseVarIndex + relIndex] but instead
-             * use UserVar[BaseVarIndex + 0] for SENSOR_TYPE_SINGLE; temporarily overwrite this value
-             * to make sure we send the correct sensor reading.
-             */
-            float oldValue = UserVar[BaseVarIndex];
-            UserVar[BaseVarIndex] = UserVar[BaseVarIndex + relIndex];
-            CPluginCall(TempEvent.ProtocolIndex, CPLUGIN_PROTOCOL_SEND, &TempEvent, dummyString);
-            UserVar[BaseVarIndex] = oldValue;
-
-            addLog(LOG_LEVEL_DEBUG, String("[P151] DUCO SER GW: Variable #") + (int) relIndex + " updated for controller " + (int)ControllerIndex);
-        }
-    }
-}
-
