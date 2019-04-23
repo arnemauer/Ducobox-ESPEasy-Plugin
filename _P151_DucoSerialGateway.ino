@@ -126,12 +126,12 @@ boolean Plugin_151(byte function, struct EventStruct *event, String& string)
       {
 
         addFormNote(F("For use with domoticz you can define an idx per value. If you use this you can ignore 'Send to Controller' below."));
-        addFormNumericBox(F("IDX Flow percentage"), F("Plugin_151_IDX1"), Settings.TaskDevicePluginConfig[event->TaskIndex][PLUGIN_CONFIG_IDX_FLOW], 0,5000);
-        addFormNumericBox(F("IDX DUCOBOX status"), F("Plugin_151_IDX2"), Settings.TaskDevicePluginConfig[event->TaskIndex][PLUGIN_CONFIG_IDX_STATUS], 0,5000);
-        addFormNumericBox(F("IDX CO2-sensor PPM"), F("Plugin_151_IDX3"), Settings.TaskDevicePluginConfig[event->TaskIndex][PLUGIN_CONFIG_IDX_CO2_PPM], 0,5000);
-        addFormNumericBox(F("IDX CO2-sensor temperature"), F("Plugin_151_IDX4"), Settings.TaskDevicePluginConfig[event->TaskIndex][PLUGIN_CONFIG_IDX_CO2_TEMP], 0, 5000);
-        addFormNumericBox(F("Ducobox nodenumber (default: 1)"), F("Plugin_151_ducobox_nodenumber"), Settings.TaskDevicePluginConfig[event->TaskIndex][PLUGIN_CONFIG_DUCO_BOX_NODE], 0,1000);
-        addFormNumericBox(F("CO2 controller nodenumber"), F("Plugin_151_co2controller_nodenumber"), Settings.TaskDevicePluginConfig[event->TaskIndex][PLUGIN_CONFIG_CO2_NODE], 0,1000);
+        addFormNumericBox(F("IDX Flow percentage"), F("Plugin_151_IDX1"), PCONFIG(PLUGIN_CONFIG_IDX_FLOW), 0,5000);
+        addFormNumericBox(F("IDX DUCOBOX status"), F("Plugin_151_IDX2"), PCONFIG(PLUGIN_CONFIG_IDX_STATUS), 0,5000);
+        addFormNumericBox(F("IDX CO2-sensor PPM"), F("Plugin_151_IDX3"), PCONFIG(PLUGIN_CONFIG_IDX_CO2_PPM), 0,5000);
+        addFormNumericBox(F("IDX CO2-sensor temperature"), F("Plugin_151_IDX4"), PCONFIG(PLUGIN_CONFIG_IDX_CO2_TEMP), 0, 5000);
+        addFormNumericBox(F("Ducobox nodenumber (default: 1)"), F("Plugin_151_ducobox_nodenumber"), PCONFIG(PLUGIN_CONFIG_DUCO_BOX_NODE), 0,1000);
+        addFormNumericBox(F("CO2 controller nodenumber"), F("Plugin_151_co2controller_nodenumber"), PCONFIG(PLUGIN_CONFIG_CO2_NODE), 0,1000);
 
         success = true;
         break;
@@ -140,12 +140,12 @@ boolean Plugin_151(byte function, struct EventStruct *event, String& string)
     case PLUGIN_WEBFORM_SAVE:
       {
 
-        Settings.TaskDevicePluginConfig[event->TaskIndex][PLUGIN_CONFIG_IDX_FLOW] = getFormItemInt(F("Plugin_151_IDX1"));
-        Settings.TaskDevicePluginConfig[event->TaskIndex][PLUGIN_CONFIG_IDX_STATUS] = getFormItemInt(F("Plugin_151_IDX2"));
-        Settings.TaskDevicePluginConfig[event->TaskIndex][PLUGIN_CONFIG_IDX_CO2_PPM] = getFormItemInt(F("Plugin_151_IDX3"));
-        Settings.TaskDevicePluginConfig[event->TaskIndex][PLUGIN_CONFIG_IDX_CO2_TEMP] = getFormItemInt(F("Plugin_151_IDX4"));
-        Settings.TaskDevicePluginConfig[event->TaskIndex][PLUGIN_CONFIG_DUCO_BOX_NODE] = getFormItemInt(F("Plugin_151_ducobox_nodenumber"));
-        Settings.TaskDevicePluginConfig[event->TaskIndex][PLUGIN_CONFIG_CO2_NODE] = getFormItemInt(F("Plugin_151_co2controller_nodenumber"));
+        PCONFIG(PLUGIN_CONFIG_IDX_FLOW) = getFormItemInt(F("Plugin_151_IDX1"));
+        PCONFIG(PLUGIN_CONFIG_IDX_STATUS) = getFormItemInt(F("Plugin_151_IDX2"));
+        PCONFIG(PLUGIN_CONFIG_IDX_CO2_PPM) = getFormItemInt(F("Plugin_151_IDX3"));
+        PCONFIG(PLUGIN_CONFIG_IDX_CO2_TEMP) = getFormItemInt(F("Plugin_151_IDX4"));
+        PCONFIG(PLUGIN_CONFIG_DUCO_BOX_NODE) = getFormItemInt(F("Plugin_151_ducobox_nodenumber"));
+        PCONFIG(PLUGIN_CONFIG_CO2_NODE) = getFormItemInt(F("Plugin_151_co2controller_nodenumber"));
         success = true;
         break;
       }
@@ -185,22 +185,22 @@ boolean Plugin_151(byte function, struct EventStruct *event, String& string)
 
                 if(UserVar[event->BaseVarIndex] != duco_data[DUCO_DATA_FLOW]){
                     UserVar[event->BaseVarIndex]   = duco_data[DUCO_DATA_FLOW]; // flow percentage
-                    Plugin_151_Controller_Update(task_index, event->BaseVarIndex,  Settings.TaskDevicePluginConfig[event->TaskIndex][PLUGIN_CONFIG_IDX_FLOW], SENSOR_TYPE_SINGLE,0);
+                    Plugin_151_Controller_Update(task_index, event->BaseVarIndex,   PCONFIG(PLUGIN_CONFIG_IDX_FLOW), SENSOR_TYPE_SINGLE,0);
                 }
 
                 if(UserVar[event->BaseVarIndex+1] != duco_data[DUCO_DATA_STATUS]){
                     UserVar[event->BaseVarIndex+1]   = duco_data[DUCO_DATA_STATUS]; // flow percentage
-                    Plugin_151_Controller_Update(task_index, event->BaseVarIndex+1,   Settings.TaskDevicePluginConfig[event->TaskIndex][PLUGIN_CONFIG_IDX_STATUS], SENSOR_TYPE_SINGLE,0);
+                    Plugin_151_Controller_Update(task_index, event->BaseVarIndex+1, PCONFIG(PLUGIN_CONFIG_IDX_STATUS), SENSOR_TYPE_SINGLE,0);
                 }
 
                 if(UserVar[event->BaseVarIndex+2] != duco_data[DUCO_DATA_CO2_PPM]){
                     UserVar[event->BaseVarIndex+2]   = duco_data[DUCO_DATA_CO2_PPM]; // flow percentage
-                    Plugin_151_Controller_Update(task_index, event->BaseVarIndex+2,  Settings.TaskDevicePluginConfig[event->TaskIndex][PLUGIN_CONFIG_IDX_CO2_PPM], SENSOR_TYPE_SINGLE,0);
+                    Plugin_151_Controller_Update(task_index, event->BaseVarIndex+2, PCONFIG(PLUGIN_CONFIG_IDX_CO2_PPM), SENSOR_TYPE_SINGLE,0);
                 }
 
                 if(UserVar[event->BaseVarIndex+3] != duco_data[DUCO_DATA_CO2_TEMP]){
                     UserVar[event->BaseVarIndex+3]   = duco_data[DUCO_DATA_CO2_TEMP]; // CO2 temperature
-                    Plugin_151_Controller_Update(task_index,event->BaseVarIndex+3,   Settings.TaskDevicePluginConfig[event->TaskIndex][PLUGIN_CONFIG_IDX_CO2_TEMP], SENSOR_TYPE_SINGLE,1);
+                    Plugin_151_Controller_Update(task_index, event->BaseVarIndex+3, PCONFIG(PLUGIN_CONFIG_IDX_CO2_TEMP), SENSOR_TYPE_SINGLE,1);
                 }
                 //sendData(event);
                 
