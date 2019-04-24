@@ -1,6 +1,6 @@
 //#################################### Plugin 152: DUCO Serial Box Sensors ##################################
 //
-//  DUCO Serial Gateway to read out the optionally instaled Box Sensors
+//  DUCO Serial Gateway to read out the optionally installed Box Sensors
 //
 //  https://github.com/arnemauer/Ducobox-ESPEasy-Plugin
 //  http://arnemauer.nl/ducobox-gateway/
