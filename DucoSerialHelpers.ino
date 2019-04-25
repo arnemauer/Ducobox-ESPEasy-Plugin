@@ -31,6 +31,13 @@ unsigned int duco_serial_rowCounter = 0;
  */
 void DucoSerialSendUpdate(String logPrefix, byte TaskIndex, byte BaseVarIndex, byte relIndex, int IDX, int valueDecimals)
 {
+    if (IDX == 0) {
+        /*
+         * Sending IDX 0 is not supported and most likely means the user has
+         * not configured this value; do not send an update.
+         */
+        return;
+    }
 
     LoadTaskSettings(TaskIndex);   
     ExtraTaskSettings.TaskDeviceValueDecimals[0] = valueDecimals;
