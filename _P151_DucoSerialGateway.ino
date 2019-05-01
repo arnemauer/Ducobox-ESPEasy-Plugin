@@ -675,31 +675,11 @@ bool parseCO2PPM(unsigned int *value){
         delay(20);
     }
 
-    if(CO2_start_byte > 0){
-        uint8_t value_bytes[4];
-        unsigned int number_size = 0;
-        for (int j = 0; j <= 4; j++) {
-            if(duco_serial_buf[CO2_start_byte+j] == 0x0d){ // 0x0d = Carriage Return (next line), determine size of numbers
-                number_size = j-1;
-                break;
-            }else if (duco_serial_buf[CO2_start_byte+j] >= '0' && duco_serial_buf[CO2_start_byte+j] <= '9'){ // check if number is valid ascii character
-                value_bytes[j] = duco_serial_buf[CO2_start_byte+j] - '0'; // convert ascii to int
-            }else{
-                value_bytes[j] = 0; // invalid ascii character, ignore byte
-            }
-        }
-
-        if(number_size == 0){ // 0-9
-            *value = value_bytes[0];
-            return true;
-        }else if(number_size == 1){ // 0 - 99
-            *value = ((value_bytes[0] * 10) + (value_bytes[1]));
-            return true;
-        }else if(number_size == 2){ // 0 - 999
-            *value = ((value_bytes[0] * 100) + (value_bytes[1] * 10) + (value_bytes[2]));
-            return true;
-        }else if(number_size == 3){ // 0 - 9999
-            *value = ((value_bytes[0] * 1000) + (value_bytes[1] * 100) + (value_bytes[2] * 10) + (value_bytes[3]));
+    if(CO2_start_byte > 0) {
+        duco_serial_buf[duco_serial_bytes_read] = '\0';
+        unsigned long long_value = strtoul((char*) duco_serial_buf + CO2_start_byte, NULL, 10);
+        if (long_value != ULONG_MAX && long_value != 0) {
+            *value = long_value;
             return true;
         }
     }
