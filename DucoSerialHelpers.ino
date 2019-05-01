@@ -166,12 +166,12 @@ bool DucoSerialReceiveData(String logPrefix, long timeout, bool verbose)
 
 }
 
-bool DucoSerialCheckCommandInResponse(String logPrefix, uint8_t command[], bool verbose)
+bool DucoSerialCheckCommandInResponse(String logPrefix, const char* command, bool verbose)
 {
     // Ducobox returns the command, lets check if the command matches 
     bool commandReceived = false;
 
-    for (int j = 0; j <= (sizeof(command) / sizeof(uint8_t)  ); j++) {
+    for (int j = 0; j < strlen(command); j++) {
             
         if(duco_serial_buf[j] == command[j]){
             commandReceived = true;

@@ -24,15 +24,10 @@ boolean Plugin_151_init = false;
 
             String loggy;
 
-
-#define ANSWER_READ_NODE_SIZE 16
-uint8_t answerReadNode[ANSWER_READ_NODE_SIZE] = {0x6e, 0x6f , 0x64 , 0x65 , 0x70 , 0x61 , 0x72 , 0x61 , 0x67 , 0x65 , 0x74 , 0x20 , 0x32 , 0x20 , 0x37 , 0x34};
-
 // 9 bytes
 #define CMD_READ_NETWORK_SIZE 9
 uint8_t cmdReadNetwork[CMD_READ_NETWORK_SIZE] = {0x4e, 0x65, 0x74, 0x77, 0x6f, 0x72, 0x6b, 0x0d, 0x0a};
-#define ANSWER_READ_NETWORK_SIZE 8
-uint8_t answerReadNetwork[ANSWER_READ_NETWORK_SIZE] = {0x6e, 0x65, 0x74, 0x77, 0x6f, 0x72, 0x6b, 0x0d};
+char* answerReadNetwork = "network\r";
 
 uint8_t ventilationColumnName[] = {0x25, 0x64, 0x62, 0x74}; // %dbt
 uint8_t ducoboxStatusColumnName[] =  {0x73, 0x74, 0x61, 0x74}; // stat = 0x73, 0x74, 0x61, 0x74
@@ -598,7 +593,9 @@ void readCO2PPM(){
     // if succesfully send command then receive response
     if(commandSendResult){
         if(DucoSerialReceiveData(PLUGIN_LOG_PREFIX_151, PLUGIN_READ_TIMEOUT_151, serialLoggingEnabled())){
-            if(DucoSerialCheckCommandInResponse(PLUGIN_LOG_PREFIX_151, answerReadNode, serialLoggingEnabled())){
+            /* Expected response is command minus the \n */
+            command[strlen(command) - 1] = '\0';
+            if(DucoSerialCheckCommandInResponse(PLUGIN_LOG_PREFIX_151, command, serialLoggingEnabled())){
                 unsigned int temp_CO2PPM;
                 if (parseCO2PPM(&temp_CO2PPM)) {
                     p151_duco_data[P151_DATA_CO2_PPM] = (float)temp_CO2PPM;

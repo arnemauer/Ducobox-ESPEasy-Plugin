@@ -149,7 +149,7 @@ void readBoxSensors(){
     int commandSendResult = DucoSerialSendCommand(PLUGIN_LOG_PREFIX_152, (byte*) command, strlen(command));
     if (commandSendResult) {
         if (DucoSerialReceiveData(PLUGIN_LOG_PREFIX_152, PLUGIN_READ_TIMEOUT_152, false)) {
-            if (DucoSerialCheckCommandInResponse(PLUGIN_LOG_PREFIX_152, (uint8_t*) "sensorinfo", false)) {
+            if (DucoSerialCheckCommandInResponse(PLUGIN_LOG_PREFIX_152, "sensorinfo", false)) {
                 addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_152 + "Received correct response on sensorinfo");
                 /* Example output:
                     [SENSOR] INFO
