@@ -96,9 +96,9 @@ boolean Plugin_152(byte function, struct EventStruct *event, String& string)
             Serial.begin(115200, SERIAL_8N1);
             Plugin_152_init = true;
 
-            p152_duco_data[P152_DATA_BOX_TEMP] = 0.0; // box temp
-            p152_duco_data[P152_DATA_BOX_RH] = 0.0; // box rh
-            p152_duco_data[P152_DATA_BOX_CO2_PPM] = 0; // box CO2 ppm
+            p152_duco_data[P152_DATA_BOX_TEMP] = NAN; // box temp
+            p152_duco_data[P152_DATA_BOX_RH] = NAN; // box rh
+            p152_duco_data[P152_DATA_BOX_CO2_PPM] = NAN; // box CO2 ppm
 
             success = true;
             break;
@@ -136,15 +136,20 @@ boolean Plugin_152(byte function, struct EventStruct *event, String& string)
 void readBoxSensors(){
     addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_152 + "Start readBoxSensors");
     
+    /* Reset values to NAN; only update values we can correctly read */
+    for (int i = 0; i < P152_DATA_LAST; i++) {
+        p152_duco_data[i] = NAN;
+    }
+
     /*
      * Read box sensor information; this could contain CO2, Temperature and
      * Relative Humidity values, depending on the installed box sensors.
      */
     char command[] = "sensorinfo\r\n";
-    int commandSendResult = DucoSerialSendCommand(PLUGIN_LOG_PREFIX_152, (byte*) command, strlen(command));
+    int commandSendResult = DucoSerialSendCommand(PLUGIN_LOG_PREFIX_152, command);
     if (commandSendResult) {
         if (DucoSerialReceiveData(PLUGIN_LOG_PREFIX_152, PLUGIN_READ_TIMEOUT_152, false)) {
-            if (DucoSerialCheckCommandInResponse(PLUGIN_LOG_PREFIX_152, (uint8_t*) "sensorinfo", false)) {
+            if (DucoSerialCheckCommandInResponse(PLUGIN_LOG_PREFIX_152, "sensorinfo", false)) {
                 addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_152 + "Received correct response on sensorinfo");
                 /* Example output:
                     [SENSOR] INFO
@@ -161,7 +166,7 @@ void readBoxSensors(){
                 duco_serial_buf[duco_serial_bytes_read] = '\0';
 
                 char *buf = (char*)duco_serial_buf;
-	            char *token = strtok(buf, "\r");
+	              char *token = strtok(buf, "\r");
                 unsigned int raw_value;
                 while (token != NULL) {
                     char logBuf[30];
