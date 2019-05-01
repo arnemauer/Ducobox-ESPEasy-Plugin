@@ -24,14 +24,12 @@ boolean Plugin_151_init = false;
 
             String loggy;
 
-// 9 bytes
-#define CMD_READ_NETWORK_SIZE 9
-uint8_t cmdReadNetwork[CMD_READ_NETWORK_SIZE] = {0x4e, 0x65, 0x74, 0x77, 0x6f, 0x72, 0x6b, 0x0d, 0x0a};
-char* answerReadNetwork = "network\r";
+const char *cmdReadNetwork = "Network\r\n";
+const char *answerReadNetwork = "network\r";
 
-uint8_t ventilationColumnName[] = {0x25, 0x64, 0x62, 0x74}; // %dbt
-uint8_t ducoboxStatusColumnName[] =  {0x73, 0x74, 0x61, 0x74}; // stat = 0x73, 0x74, 0x61, 0x74
-uint8_t tempColumnName[] = {0x74, 0x65, 0x6d, 0x70};  //temp = 0x74, 0x65, 0x6d, 0x70
+const char ventilationColumnName[] = "%dbt";
+const char ducoboxStatusColumnName[] = "stat";
+const char tempColumnName[] = "temp";
 
 const uint8_t DucoStatusModes [13][5] = 
 {
@@ -208,16 +206,13 @@ boolean Plugin_151(byte function, struct EventStruct *event, String& string)
 
 //    // row 3 = "  node|addr|type|ptcl|cerr|prnt|asso|stts|stat|cntdwn|%dbt|trgt|cval|snsr|ovrl|capin |capout|tree|temp|info" (header)
 
-unsigned int getColumnNumberByColumnName(uint8_t columnName[]){
+unsigned int getColumnNumberByColumnName(const char *columnName){
     int currentRow = 3; // row with columnnames
     int separatorCounter = 0; 
     int columnNumber = 0;
     //bool startColumnNameCheck = true;
 
-    int charCount = 0;
-
-    // count characters of the columnName whe are looking for
-    charCount = sizeof(columnName)/sizeof(uint8_t);
+    int charCount = strlen(columnName);
 
            // String loggy = F("[P151] DUCO SER GW: chars: " );
             char lossebyte[6];
@@ -537,7 +532,7 @@ void readNetworkList(){
     addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_151 + "start readNetworkList");
 
     // SEND COMMAND
-    bool commandSendResult = DucoSerialSendCommand(PLUGIN_LOG_PREFIX_151, cmdReadNetwork, CMD_READ_NETWORK_SIZE);
+    bool commandSendResult = DucoSerialSendCommand(PLUGIN_LOG_PREFIX_151, cmdReadNetwork);
 
     // if succesfully send command then receive response
     if(commandSendResult){
@@ -588,7 +583,7 @@ void readCO2PPM(){
     // SEND COMMAND: nodeparaget <Node> 74
     char command[20] = ""; /* 17 bytes + max 2 byte nodenumber + \r\n */
     snprintf_P(command, sizeof(command), "nodeparaget %d 74\r\n", Settings.TaskDevicePluginConfig[task_index][P151_CONFIG_CO2_NODE]);
-    int commandSendResult = DucoSerialSendCommand(PLUGIN_LOG_PREFIX_151, (byte*) command, strlen(command));
+    int commandSendResult = DucoSerialSendCommand(PLUGIN_LOG_PREFIX_151, command);
    
     // if succesfully send command then receive response
     if(commandSendResult){

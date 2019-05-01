@@ -76,14 +76,14 @@ void DucoSerialSendUpdate(String logPrefix, byte TaskIndex, byte BaseVarIndex, b
     }
 }
 
-int DucoSerialSendCommand(String logPrefix, byte command[], int size)
+int DucoSerialSendCommand(String logPrefix, const char *command)
 {
     bool error=false;
 
     // DUCO throws random debug info on the serial, lets flush input buffer.
     DucoSerialFlush();
 
-    for (int m = 0; m <= size-1; m++) {
+    for (int m = 0; m < strlen(command); m++) {
        delay(10); // 20ms = buffer overrun while reading serial data. // ducosoftware uses +-15ms.
        int bytesSend = Serial.write(command[m]);
        if(bytesSend != 1){
@@ -169,26 +169,16 @@ bool DucoSerialReceiveData(String logPrefix, long timeout, bool verbose)
 bool DucoSerialCheckCommandInResponse(String logPrefix, const char* command, bool verbose)
 {
     // Ducobox returns the command, lets check if the command matches 
-    bool commandReceived = false;
-
-    for (int j = 0; j < strlen(command); j++) {
-            
-        if(duco_serial_buf[j] == command[j]){
-            commandReceived = true;
-        }else{
-            commandReceived = false;
-            break;
-        }
-    }
-
-    if(commandReceived == true){
+    if (strlen(command) <= duco_serial_bytes_read &&
+        strncmp(command, (char*) duco_serial_buf, strlen(command)) == 0) {
         if (verbose) {
             addLog(LOG_LEVEL_DEBUG, logPrefix + "Expected command received.");
         }
+        return true;
     }else{
         if (verbose) {
             addLog(LOG_LEVEL_DEBUG, logPrefix + "Unexpected command received.");
         }
+        return false;
     }
-    return commandReceived;
 }

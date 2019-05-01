@@ -146,7 +146,7 @@ void readBoxSensors(){
      * Relative Humidity values, depending on the installed box sensors.
      */
     char command[] = "sensorinfo\r\n";
-    int commandSendResult = DucoSerialSendCommand(PLUGIN_LOG_PREFIX_152, (byte*) command, strlen(command));
+    int commandSendResult = DucoSerialSendCommand(PLUGIN_LOG_PREFIX_152, command);
     if (commandSendResult) {
         if (DucoSerialReceiveData(PLUGIN_LOG_PREFIX_152, PLUGIN_READ_TIMEOUT_152, false)) {
             if (DucoSerialCheckCommandInResponse(PLUGIN_LOG_PREFIX_152, "sensorinfo", false)) {
