@@ -18,6 +18,7 @@
 #define PLUGIN_LOG_PREFIX_153   String("[P153] DUCO EXTERNAL SENSOR: ")
 
 boolean Plugin_153_init = false;
+boolean Plugin_153_toggle_sensor = false; // switches between reading temperature and reading CO2/RH
 
 typedef enum {
     P153_DATA_SENSOR_TEMP = 0,
@@ -132,6 +133,7 @@ boolean Plugin_153(byte function, struct EventStruct *event, String& string)
 
         PCONFIG(P153_CONFIG_DEVICE_TYPE) = getFormItemInt(F("Plugin_153_DEVICE_TYPE"));
 
+        /* there must be at least 1 second between the requests otherwise the request will fail */
         if(PCONFIG(P153_CONFIG_DEVICE_TYPE) =! P153_DUCO_DEVICE_NA){
           PCONFIG(P153_CONFIG_NODE_ADDRESS) = getFormItemInt(F("Plugin_153_NODE_ADDRESS"));
           PCONFIG(P153_CONFIG_IDX_SENSOR_TEMP) = getFormItemInt(F("Plugin_153_IDX1"));
@@ -177,13 +179,20 @@ boolean Plugin_153(byte function, struct EventStruct *event, String& string)
                 addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_153 + "read external duco sensors");
 
                 if(PCONFIG(P153_CONFIG_DEVICE_TYPE) == P153_DUCO_DEVICE_CO2){
-                  readExternalSensors(P153_DATA_SENSOR_TEMP, PCONFIG(P153_CONFIG_NODE_ADDRESS));
-                  readExternalSensors(P153_DATA_SENSOR_CO2_PPM, PCONFIG(P153_CONFIG_NODE_ADDRESS));
+                  if(Plugin_153_toggle_sensor){
+                    readExternalSensors(P153_DATA_SENSOR_TEMP, PCONFIG(P153_CONFIG_NODE_ADDRESS));
+                  }else{
+                    readExternalSensors(P153_DATA_SENSOR_CO2_PPM, PCONFIG(P153_CONFIG_NODE_ADDRESS));
+                  }
                 } else if(PCONFIG(P153_CONFIG_DEVICE_TYPE) == P153_DUCO_DEVICE_RH){
-                  readExternalSensors(P153_DATA_SENSOR_TEMP, PCONFIG(P153_CONFIG_NODE_ADDRESS));
-                  readExternalSensors(P153_DATA_SENSOR_RH, PCONFIG(P153_CONFIG_NODE_ADDRESS));
+                  if(Plugin_153_toggle_sensor){
+                    readExternalSensors(P153_DATA_SENSOR_TEMP, PCONFIG(P153_CONFIG_NODE_ADDRESS));
+                  }else{
+                    readExternalSensors(P153_DATA_SENSOR_RH, PCONFIG(P153_CONFIG_NODE_ADDRESS));
+                  }
                 }
-                
+                Plugin_153_toggle_sensor= !Plugin_153_toggle_sensor;
+
 
                 if (UserVar[event->BaseVarIndex + P153_DATA_SENSOR_TEMP] != p153_duco_data[P153_DATA_SENSOR_TEMP]) {
                     UserVar[event->BaseVarIndex + P153_DATA_SENSOR_TEMP] = p153_duco_data[P153_DATA_SENSOR_TEMP];
@@ -218,6 +227,7 @@ void readExternalSensors(uint8_t dataType, int nodeAddress){
         // SEND COMMAND: nodeparaget <Node> 74
     char command[20] = ""; /* 17 bytes + max 2 byte nodenumber + \r\n */
     uint8_t parameter;
+    boolean readSuccess = false;
 
     if(dataType == P153_DATA_SENSOR_CO2_PPM){
       parameter = P153_DUCO_PARAMETER_CO2;
@@ -231,12 +241,10 @@ void readExternalSensors(uint8_t dataType, int nodeAddress){
     }else{
       return;
     }
-    
-          
-    /* Reset value to NAN; only update values we can correctly read */
-        p153_duco_data[dataType] = NAN;
-
     addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_153 + "Start read external sensor. " + logBuf );
+   
+    /* Reset value to NAN; only update values we can correctly read */
+    p153_duco_data[dataType] = NAN;
 
     snprintf_P(command, sizeof(command), "nodeparaget %d %d\r\n", nodeAddress, parameter);
     int commandSendResult = DucoSerialSendCommand(PLUGIN_LOG_PREFIX_153, command);
@@ -246,7 +254,7 @@ void readExternalSensors(uint8_t dataType, int nodeAddress){
             /* Expected response is command minus the \n */
             command[strlen(command) - 1] = '\0';
             if (DucoSerialCheckCommandInResponse(PLUGIN_LOG_PREFIX_153, command, false)) {
-                addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_153 + "Received correct response on sensorinfo");
+                addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_153 + "Command confirmed by ducobox");
                 /* Example output:
                    > nodeparaget 2 73
                     Get PARA 73 of NODE 2
@@ -267,35 +275,52 @@ void readExternalSensors(uint8_t dataType, int nodeAddress){
                 duco_serial_buf[duco_serial_bytes_read] = '\0';
 
                 char *buf = (char*)duco_serial_buf;
-	            char *token = strtok(buf, "\r");
+	              char *token = strtok(buf, "\r");
                 unsigned int raw_value;
+                char logBuf[30];
+                char bigLogBuf[200];
+
                 while (token != NULL) {
-                    char logBuf[30];
+
+                  /* if you want to see what's happening on the serial port, uncomment this */ /*
+                  snprintf(bigLogBuf, sizeof(bigLogBuf), "%s\n", token);
+                  addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_153 + bigLogBuf);
+                  delay(10);*/
+              
                     if (sscanf(token, "  --> %u", &raw_value) == 1) {
 
                       if(dataType == P153_DATA_SENSOR_CO2_PPM){
                         unsigned int co2_ppm = raw_value; /* No conversion required */
                         p153_duco_data[P153_DATA_SENSOR_CO2_PPM] = co2_ppm;
                         snprintf(logBuf, sizeof(logBuf), "CO2 PPM: %u = %u PPM", raw_value, co2_ppm);
+                        readSuccess = true;
 
                       }else if(dataType == P153_DATA_SENSOR_TEMP){
                         float temp = (float) raw_value / 10.;
                         p153_duco_data[P153_DATA_SENSOR_TEMP] = temp;
                         snprintf(logBuf, sizeof(logBuf), "TEMP: %u = %.1f°C", raw_value, temp);
+                        readSuccess = true;
 
                       }else if(dataType == P153_DATA_SENSOR_RH){
                         float rh = (float) raw_value / 100.;
                         p153_duco_data[P153_DATA_SENSOR_RH] = rh;
                         snprintf(logBuf, sizeof(logBuf), "RH: %u = %.2f%%", raw_value, rh);
+                        readSuccess = true;
 
                       }
                       addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_153 + logBuf);
                     }
 
+
                     token = strtok(NULL, "\r");
                 }
+
+                if(!readSuccess){
+                  addLog(LOG_LEVEL_INFO, PLUGIN_LOG_PREFIX_153 + "Received invalid value");
+                }
+
             } else { 
-                addLog(LOG_LEVEL_INFO, PLUGIN_LOG_PREFIX_153 + "Received invalid response on sensorinfo");
+                addLog(LOG_LEVEL_INFO, PLUGIN_LOG_PREFIX_153 + "Received invalid response (command not confirmed by ducobox)");
             }
         }
     }
