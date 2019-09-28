@@ -125,10 +125,36 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 		addLog(LOG_LEVEL_INFO, log3);
 
 		PLUGIN_150_rf.initReceive();
-		PLUGIN_150_InitRunned=true;
-		success = true;
-		addLog(LOG_LEVEL_INFO, F("[P150] DUCO RF GW: CC1101 868Mhz transmitter initialized"));
-		attachInterrupt(Plugin_150_IRQ_pin, PLUGIN_150_DUCOinterrupt, RISING);
+
+		// check if succesfully initialised radio cc1101
+		switch(PLUGIN_150_rf.getDucoDeviceState()){
+			case 0x14: { // initialistion succesfull!
+				PLUGIN_150_InitRunned=true;
+				success = true;
+				addLog(LOG_LEVEL_INFO, F("[P150] DUCO RF GW: CC1101 868Mhz transmitter initialized"));
+				attachInterrupt(Plugin_150_IRQ_pin, PLUGIN_150_DUCOinterrupt, RISING);
+				break;
+			}
+			case 0x15: {
+				addLog(LOG_LEVEL_DEBUG, F("[P150] DUCO RF GW: Initialisation -> calibration failed. No response from CC1101 or status not idle."));
+			break;
+			}
+			case 0x16: {
+				addLog(LOG_LEVEL_DEBUG, F("[P150] DUCO RF GW: Initialisation -> set RXmode failed. No response from CC1101 or status not rxmode."));
+			break;
+			}
+
+		}
+
+
+
+
+		if(PLUGIN_150_rf.getDucoDeviceState() == 0x14){
+			
+		}else{
+			// initialisation failed...
+			success = false;
+		}
 
 		break;
 	}

@@ -33,6 +33,8 @@ const uint8_t ducoDeviceState_disjoinWaitingForConfirmation = 0x0C;
 const uint8_t ducoDeviceState_disjointed = 0x0D;	
 
 const uint8_t ducoDeviceState_initialised = 0x14;	
+const uint8_t ducoDeviceState_initialisationCalibrationFailed = 0x15;
+const uint8_t ducoDeviceState_initialisationRxmodeFailed = 0x16;
 
 
 		// 0x00 = not initialised
@@ -100,6 +102,8 @@ class DucoCC1101 : protected CC1101
 		// 0x0D = device disjoined
 
 		// 0x14 = initialised with address/networkid from config
+		// 0x15 = initialisation failed stage 1 -> calibration failed or no response from cc1101
+		// 0x16 = initialisation failed stage 2 -> set RX mode failed or no response from cc1101
 
 		uint8_t testCounter;
 		uint8_t ducoboxLastRssiByte;
@@ -121,7 +125,9 @@ class DucoCC1101 : protected CC1101
 		void setSendTries(uint8_t sendTries) { this->sendTries = sendTries; }
 		
 		uint8_t getCurrentVentilationMode() { return this->currentVentilationMode; }						//retrieve last received/parsed command from remote	
+		uint8_t getDucoDeviceState() { return this->ducoDeviceState; } // retrieve radio/duco state
 		
+
 
 
 		//deviceid

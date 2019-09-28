@@ -142,13 +142,35 @@ void DucoCC1101::initReceive()
 	writeCommand(CC1101_SCAL);
 
 	//wait for calibration to finish
-	while ((readRegisterWithSyncProblem(CC1101_MARCSTATE, CC1101_STATUS_REGISTER)) != CC1101_MARCSTATE_IDLE) yield();
-	
+	//while ((readRegisterWithSyncProblem(CC1101_MARCSTATE, CC1101_STATUS_REGISTER)) != CC1101_MARCSTATE_IDLE) yield();
+	// ADDED: Timeout added because device will loop when there is no response from cc1101. 
+	unsigned long startedWaiting = millis();
+	while((readRegisterWithSyncProblem(CC1101_MARCSTATE, CC1101_STATUS_REGISTER)) != CC1101_MARCSTATE_IDLE && millis() - startedWaiting <= 1000)
+	{
+		yield();
+	}
+
+	if((readRegisterWithSyncProblem(CC1101_MARCSTATE, CC1101_STATUS_REGISTER)) != CC1101_MARCSTATE_IDLE){
+		this->ducoDeviceState = ducoDeviceState_initialisationCalibrationFailed;
+		return;
+	}
+
+
 	writeCommand(CC1101_SRX);
-	
 	// wait till in rx mode (0x1F)
-	while ((readRegisterWithSyncProblem(CC1101_MARCSTATE, CC1101_STATUS_REGISTER)) != CC1101_MARCSTATE_RX) yield();
-	
+	//while ((readRegisterWithSyncProblem(CC1101_MARCSTATE, CC1101_STATUS_REGISTER)) != CC1101_MARCSTATE_RX) yield();
+	// ADDED: Timeout added because device will loop when there is no response from cc1101. 
+	startedWaiting = millis();
+	while((readRegisterWithSyncProblem(CC1101_MARCSTATE, CC1101_STATUS_REGISTER)) != CC1101_MARCSTATE_RX && millis() - startedWaiting <= 1000)
+	{
+		yield();
+	}
+
+	if((readRegisterWithSyncProblem(CC1101_MARCSTATE, CC1101_STATUS_REGISTER)) != CC1101_MARCSTATE_RX){
+		this->ducoDeviceState = ducoDeviceState_initialisationRxmodeFailed;
+		return;
+	}	
+
 	if(this->deviceAddress != 0x00){
 		this->ducoDeviceState = ducoDeviceState_initialised;
 	}
@@ -203,26 +225,26 @@ bool DucoCC1101::checkForNewPacket()
 		// CREATE LOG ENTRY OF RECEIVED PACKET
 		String log = F("[P150] DUCO RF GW: Received message [SNDR:");
 		log += String(inDucoPacket.deviceIdSender, DEC);
-		log += F("; RECVR: ");
+		log += F("; RECVR:");
 		log += String(inDucoPacket.deviceIdReceiver, DEC);
 		log += F("; SNDR2:");
 		log += String(inDucoPacket.deviceIdSender2, DEC);
-		log += F("; RECVR2: ");
+		log += F(";RECVR2:");
 		log += String(inDucoPacket.deviceIdReceiver2, DEC);
-		log += F("] NetworkID: [");
+		log += F("] NetworkID:");
 		log += String(inDucoPacket.networkId[0], HEX) + String(inDucoPacket.networkId[1], HEX) + String(inDucoPacket.networkId[2], HEX) + String(inDucoPacket.networkId[3], HEX);
-		log += F("] Type: [");
+		log += F(" Type:");
 		log += String(inDucoPacket.messageType, HEX);
-		log += F("] Bytes:[");
+		log += F(" Bytes:");
 		log += String(inMessage.length, DEC);
-		log += F("] Counter:[");
+		log += F(" Counter:");
 		log += String(inDucoPacket.counter, HEX);
-		log += F("] Message:[");
+		log += F(" Message:[");
 
 		//log received bytes 
 		for (int i = 0; i < inDucoPacket.dataLength; i++) {
 			log += byteToHexString(inDucoPacket.data[i]);
-			log += F(", ");
+			log += F(",");
 		}
 		log += F("]");
 
