@@ -9,6 +9,7 @@ Met de RF gateway kun je de ventilatiestand (auto,laag,middel,hoog) van de Ducob
 De serial gateway sluit je met een kabel aan op de print van de Ducobox. Hierdoor is meer informatie op te vragen zoals de huidige status, de ingestelde snelheid van de ventilator, de CO2 waarde van een CO2 sensor en de temperatuur van een CO2 sensor. Het is helaas niet mogelijk om de ventilatiemodus aan te passen. Als je de ventilatiemodus wilt wijzigen combineer je de serial gateway met de RF gateway.
 
 Er zijn drie plugins voor de serial gateway:
+
 **DucoSerialGateway (P151)** 
 Deze plugin leest data over de ducobox zelf uit. Je kan hiermee de flow oftewel de snelheid van de ventilator (0 - 100%) uitlezen en de ventilatiestand (auto,laag,midden,hoog).
 
