@@ -34,6 +34,8 @@ typedef enum {
     P153_CONFIG_IDX_SENSOR_CO2_PPM = 2,
     P153_CONFIG_DEVICE_TYPE = 3,
     P153_CONFIG_NODE_ADDRESS = 4,
+    P153_CONFIG_LOG_SERIAL = 5,
+
 } P153PluginConfigs;
 
 typedef enum {
@@ -53,7 +55,7 @@ typedef enum {
     P153_DUCO_PARAMETER_TEMP = 73,
     P153_DUCO_PARAMETER_CO2 = 74,
     P153_DUCO_PARAMETER_RH = 75,
-      /* add more device:
+      /* TODO: add more device:
         - Sensorless Control valve
         - CO2 Control valve
         - Humidity Control valve
@@ -124,6 +126,8 @@ boolean Plugin_153(byte function, struct EventStruct *event, String& string)
           addFormNumericBox(F("IDX Sensor relative humidity"), F("Plugin_153_IDX2"), PCONFIG(P153_CONFIG_IDX_SENSOR_RH), 0, 5000);
         }
 
+        addFormCheckBox(F("Log serial messages to syslog"), F("Plugin151_log_serial"), PCONFIG(P153_CONFIG_LOG_SERIAL));
+
         success = true;
         break;
       }
@@ -144,6 +148,9 @@ boolean Plugin_153(byte function, struct EventStruct *event, String& string)
         } else if(PCONFIG(P153_CONFIG_DEVICE_TYPE) == P153_DUCO_DEVICE_RH){
           PCONFIG(P153_CONFIG_IDX_SENSOR_RH) = getFormItemInt(F("Plugin_153_IDX2"));
         }
+
+        PCONFIG(P153_CONFIG_LOG_SERIAL) = isFormItemChecked(F("Plugin153_log_serial"));
+
 
         success = true;
         break;
