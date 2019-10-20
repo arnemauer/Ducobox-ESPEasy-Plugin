@@ -107,6 +107,11 @@ boolean Plugin_151(byte function, struct EventStruct *event, String& string)
 
     case PLUGIN_WEBFORM_LOAD:
       {
+          
+        // if ducobox node address isnt filled in, set value to 1 (default ducobox address)
+        if(PCONFIG(P151_CONFIG_DUCO_BOX_NODE) == 0){       
+            PCONFIG(P151_CONFIG_DUCO_BOX_NODE) = 1;
+        }
 
         addFormNote(F("For use with domoticz you can define an idx per value. If you use this you can ignore 'Send to Controller' below."));
         addFormNumericBox(F("IDX Flow percentage"), F("Plugin_151_IDX1"), PCONFIG(P151_CONFIG_IDX_FLOW), 0,5000);
@@ -139,7 +144,6 @@ boolean Plugin_151(byte function, struct EventStruct *event, String& string)
 			    pinMode(Settings.TaskDevicePin2[event->TaskIndex], OUTPUT);
                 digitalWrite(Settings.TaskDevicePin2[event->TaskIndex], HIGH);
 		    }
-
 
             p151_duco_data[P151_DATA_FLOW] = NAN; // flow %
             p151_duco_data[P151_DATA_STATUS] = NAN; // DUCO_STATUS
