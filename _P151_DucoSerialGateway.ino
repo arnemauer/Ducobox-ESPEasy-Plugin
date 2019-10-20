@@ -290,7 +290,7 @@ bool parseVentilationPercentage(float *value) {
             }
         }
 
-        if (serialLoggingEnabled()) {
+        if (PLUGIN_151_serialLoggingEnabled()) {
             String logstring4 = F("Ventilation valuebytes: ");
             char lossebyte4[25];
             sprintf_P(lossebyte4, PSTR("%02X %02X %02X sizenr %u"), duco_serial_buf[start_ventilation_byte],duco_serial_buf[start_ventilation_byte+1],duco_serial_buf[start_ventilation_byte+2],number_size);
@@ -398,10 +398,10 @@ void readNetworkList(){
 
     // if succesfully send command then receive response
     if(commandSendResult){
-        if(DucoSerialReceiveData(PLUGIN_LOG_PREFIX_151, PLUGIN_READ_TIMEOUT_151, serialLoggingEnabled())){
+        if(DucoSerialReceiveData(PLUGIN_LOG_PREFIX_151, PLUGIN_READ_TIMEOUT_151, PLUGIN_151_serialLoggingEnabled())){
             logArray(duco_serial_buf, duco_serial_bytes_read-1, 0);
 
-            if(DucoSerialCheckCommandInResponse(PLUGIN_LOG_PREFIX_151, answerReadNetwork, serialLoggingEnabled())){
+            if(DucoSerialCheckCommandInResponse(PLUGIN_LOG_PREFIX_151, answerReadNetwork, PLUGIN_151_serialLoggingEnabled())){
                 float ventilationPercentage = NAN;
                  // parse ventilation percentage from data
                 if (parseVentilationPercentage(&ventilationPercentage)) {
@@ -433,12 +433,13 @@ answer:
   */
  
 
-bool serialLoggingEnabled() {
+
+bool PLUGIN_151_serialLoggingEnabled() {
     return Settings.TaskDevicePluginConfig[task_index][P151_CONFIG_LOG_SERIAL] == 1;
 }
 
 int logArray(uint8_t array[], int len, int fromByte) {
-    if (!serialLoggingEnabled()) {
+    if (!PLUGIN_151_serialLoggingEnabled()) {
         return -1;
     }
 
@@ -459,7 +460,7 @@ int logArray(uint8_t array[], int len, int fromByte) {
             logstring = F("");
         }
     }
-    logstring += F("END");
+    logstring += F(" END");
     addLog(LOG_LEVEL_INFO,logstring);
     return -1;
 }

@@ -179,6 +179,8 @@ void CC1101::readBurstRegister(uint8_t* buffer, uint8_t address, uint8_t length)
 	deselect();
 }
 
+
+
 //wait for fixed length in rx fifo
 uint8_t CC1101::receiveData(CC1101Packet* packet)
 {
@@ -220,7 +222,19 @@ void CC1101::sendData(CC1101Packet *packet)
 	uint8_t txStatus, MarcState;
 	uint8_t length;
 	
-	//writeCommand(CC1101_SIDLE);		//idle
+	writeCommand(CC1101_SIDLE);		//idle
+
+	txStatus = readRegisterWithSyncProblem(CC1101_TXBYTES, CC1101_STATUS_REGISTER);
+		
+	//clear TX fifo if needed
+	if (txStatus & CC1101_BITS_TX_FIFO_UNDERFLOW)
+	{
+		writeCommand(CC1101_SIDLE);	//idle
+		writeCommand(CC1101_SFTX);	//flush TX buffer
+	}	
+	
+	writeCommand(CC1101_SIDLE);		//idle	
+
 
 	//determine how many bytes to send
 	length = (packet->length <= CC1101_DATA_LEN ? packet->length : CC1101_DATA_LEN);
@@ -266,13 +280,7 @@ void CC1101::sendData(CC1101Packet *packet)
 		}
 	}
 
-	//wait until transmission is finished (TXOFF_MODE is expected to be set to 0/IDLE or TXFIFO_UNDERFLOW)
-
-	//while ((readRegisterWithSyncProblem(CC1101_MARCSTATE, CC1101_STATUS_REGISTER)) != CC1101_MARCSTATE_RX);
-
-
-
-	//ESP.wdtDisable();
+	//wait until transmission is finished (TXOFF_MODE is expected to be set to 3/RX)
 
 	do
 	{
@@ -282,11 +290,4 @@ void CC1101::sendData(CC1101Packet *packet)
 	}
   	while ((readRegisterWithSyncProblem(CC1101_MARCSTATE, CC1101_STATUS_REGISTER)) != CC1101_MARCSTATE_RX);
 	  
-//	  	Serial.println("DUCO: message sent!");
-
-//delay(1);
-//ESP.wdtEnable(1);
-
-
-
 }

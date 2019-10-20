@@ -116,7 +116,7 @@ void DucoSerialFlush()
         long start = millis();
         while ((millis() - start) < 200) {
             while(Serial.available() > 0){
-                Serial.read();
+               Serial.read();
             }
         }
 }  

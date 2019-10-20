@@ -16,7 +16,7 @@
 //This extra settings struct is needed because the default settingsstruct doesn't support strings
 struct PLUGIN_150_ExtraSettingsStruct
 {	uint8_t networkId[4];
-	uint8_t deviceAddress;
+//	uint8_t deviceAddress;
 } PLUGIN_150_ExtraSettings;
 
 
@@ -31,15 +31,23 @@ int PLUGIN_150_OldState=1;
 int8_t Plugin_150_IRQ_pin=-1;
 int8_t Plugin_150_LED_pin=-1;
 bool Plugin_150_LED_status=false; // false = off, true=on
-
 bool PLUGIN_150_InitRunned = false;
 
+bool Plugin_150_logRF = true;
 
 
 #define PLUGIN_150
 #define PLUGIN_ID_150         150
 #define PLUGIN_NAME_150       "DUCO ventilation remote"
 #define PLUGIN_VALUENAME1_150 "Ventilationmode"
+#define PLUGIN_LOG_PREFIX_150   String("[P150] DUCO RF GW: ")
+
+typedef enum {
+	P150_CONFIG_DEVICE_ADDRESS = 0,
+    P150_CONFIG_LOG_RF = 1,
+} P150PluginConfigs;
+
+
 
 boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 {
@@ -89,21 +97,24 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 		noInterrupts();
 		detachInterrupt(Plugin_150_IRQ_pin);
 	
+		Plugin_150_logRF = PCONFIG(P150_CONFIG_LOG_RF);
+
 		//If configured interrupt pin differs from configured, release old pin first
 		if ((Settings.TaskDevicePin1[event->TaskIndex]!=Plugin_150_IRQ_pin) && (Plugin_150_IRQ_pin!=-1))
 		{
-			addLog(LOG_LEVEL_DEBUG, F("[P150] DUCO RF GW: IO-PIN changed, deatachinterrupt old pin"));
+			addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_150 + "IO-PIN changed, deatachinterrupt old pin");
 			detachInterrupt(Plugin_150_IRQ_pin);
 		}
+
 	
 		LoadCustomTaskSettings(event->TaskIndex, (byte*)&PLUGIN_150_ExtraSettings, sizeof(PLUGIN_150_ExtraSettings));
-		addLog(LOG_LEVEL_INFO, F("[P150] DUCO RF GW: Extra Settings PLUGIN_150 loaded"));
+		addLog(LOG_LEVEL_INFO, PLUGIN_LOG_PREFIX_150 + "Extra Settings PLUGIN_150 loaded");
 						
 		PLUGIN_150_rf.init();
-		PLUGIN_150_rf.setDeviceAddress(PLUGIN_150_ExtraSettings.deviceAddress);
+		PLUGIN_150_rf.setDeviceAddress(PCONFIG(P150_CONFIG_DEVICE_ADDRESS));
 		PLUGIN_150_rf.setNetworkId(PLUGIN_150_ExtraSettings.networkId);
 
-		String log4 = F("[P150] DUCO RF GW: Values set from config: DeviceID ");
+		String log4 = PLUGIN_LOG_PREFIX_150 + "Values set from config: DeviceID: ";
 		log4 += PLUGIN_150_rf.getDeviceAddress();
 		log4 += F(" and networkId");
 		for (uint8_t i=0; i<=3; i++){
@@ -120,7 +131,7 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 			pinMode(Plugin_150_LED_pin, OUTPUT);			
 		}
 
-		String log3 = F("[P150] DUCO RF GW: Interrupt cc1101 initialized: IRQ-pin ");
+		String log3 = PLUGIN_LOG_PREFIX_150 + "Interrupt cc1101 initialized: IRQ-pin ";
 		log3 += Plugin_150_IRQ_pin;
 		addLog(LOG_LEVEL_INFO, log3);
 
@@ -131,16 +142,16 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 			case 0x14: { // initialistion succesfull!
 				PLUGIN_150_InitRunned=true;
 				success = true;
-				addLog(LOG_LEVEL_INFO, F("[P150] DUCO RF GW: CC1101 868Mhz transmitter initialized"));
+				addLog(LOG_LEVEL_INFO, PLUGIN_LOG_PREFIX_150 + "CC1101 868Mhz transmitter initialized");
 				attachInterrupt(Plugin_150_IRQ_pin, PLUGIN_150_DUCOinterrupt, RISING);
 				break;
 			}
 			case 0x15: {
-				addLog(LOG_LEVEL_DEBUG, F("[P150] DUCO RF GW: Initialisation -> calibration failed. No response from CC1101 or status not idle."));
+				addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_150 + "Initialisation -> calibration failed. No response from CC1101 or status not idle.");
 			break;
 			}
 			case 0x16: {
-				addLog(LOG_LEVEL_DEBUG, F("[P150] DUCO RF GW: Initialisation -> set RXmode failed. No response from CC1101 or status not rxmode."));
+				addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_150 + " Initialisation -> set RXmode failed. No response from CC1101 or status not rxmode.");
 			break;
 			}
 
@@ -150,7 +161,8 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 
 
 		if(PLUGIN_150_rf.getDucoDeviceState() == 0x14){
-			
+			success = true;
+
 		}else{
 			// initialisation failed...
 			success = false;
@@ -161,7 +173,7 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 
 	case PLUGIN_EXIT:
 	{
-		addLog(LOG_LEVEL_INFO, F("[P150] DUCO RF GW: EXIT PLUGIN_150"));
+		addLog(LOG_LEVEL_INFO, PLUGIN_LOG_PREFIX_150 + "EXIT PLUGIN_150");
 		//remove interupt when plugin is removed
 		detachInterrupt(Plugin_150_IRQ_pin);
 		success = true;
@@ -184,7 +196,7 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 		PLUGIN_150_rf.checkForAck();
 		if(PLUGIN_150_rf.pollNewDeviceAddress()){
 			memcpy(PLUGIN_150_ExtraSettings.networkId, PLUGIN_150_rf.getnetworkID(), 4); //convert char array to uint8_t
-			PLUGIN_150_ExtraSettings.deviceAddress = PLUGIN_150_rf.getDeviceAddress();
+			PCONFIG(P150_CONFIG_DEVICE_ADDRESS) = PLUGIN_150_rf.getDeviceAddress();
 			SaveCustomTaskSettings(event->TaskIndex, (byte*)&PLUGIN_150_ExtraSettings, sizeof(PLUGIN_150_ExtraSettings));
 		}
 		
@@ -201,7 +213,7 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
       //Publish new data when vars are changed or init has runned or timer is running (update every 2 sec)
       if  ((PLUGIN_150_OldState!=PLUGIN_150_State) || PLUGIN_150_InitRunned)
       {
-		addLog(LOG_LEVEL_DEBUG, F("[P150] DUCO RF GW: ventilation mode changed -> UPDATE by PLUGIN_ONCE_A_SECOND"));
+		addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_150 + "ventilation mode changed -> UPDATE by PLUGIN_ONCE_A_SECOND");
 		PLUGIN_150_Publishdata(event);
         sendData(event);
 
@@ -218,7 +230,7 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 	
     case PLUGIN_READ: {    
         // This ensures that even when Values are not changing, data is send at the configured interval for aquisition 
-		addLog(LOG_LEVEL_DEBUG, F("[P150] DUCO RF GW: UPDATE by PLUGIN_READ"));
+		addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_150 + "UPDATE by PLUGIN_READ");
 		PLUGIN_150_Publishdata(event);
         success = true;
         break;
@@ -246,10 +258,10 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 			}
 
 			if(ventilationMode == 0x99){
-				addLog(LOG_LEVEL_INFO, F("[P150] DUCO RF GW: Command 'VENTMODE' - unknown ventilation mode."));
-				printWebString += F("[P150] DUCO RF GW: Command 'VENTMODE' - Unknown ventilation mode.");
+				addLog(LOG_LEVEL_INFO, PLUGIN_LOG_PREFIX_150 + "Command 'VENTMODE' - unknown ventilation mode.");
+				printWebString += PLUGIN_LOG_PREFIX_150 + "Command 'VENTMODE' - Unknown ventilation mode.";
 			}else{
-				String log5 = "[P150] DUCO RF GW: Sent command for 'VENTMODE' & '" + param1 + "' to DUCO unit";
+				String log5 = PLUGIN_LOG_PREFIX_150 + "Sent command for 'VENTMODE' & '" + param1 + "' to DUCO unit";
 				addLog(LOG_LEVEL_INFO, log5);
 				printWebString += log5;
 
@@ -262,15 +274,15 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 
 		else if (cmd.equalsIgnoreCase(F("JOIN")))
 			{
-				addLog(LOG_LEVEL_INFO, F("[P150] DUCO RF GW: Sent command for 'join' to DUCO unit"));
-				printWebString += F("[P150] DUCO RF GW: Sent command for 'join' to DUCO unit");
+				addLog(LOG_LEVEL_INFO, PLUGIN_LOG_PREFIX_150 + "Sent command for 'join' to DUCO unit");
+				printWebString += PLUGIN_LOG_PREFIX_150 + "Sent command for 'join' to DUCO unit";
 				PLUGIN_150_rf.sendJoinPacket();
 				success = true;
 			}
 		else if (cmd.equalsIgnoreCase(F("DISJOIN")))
 			{
-				addLog(LOG_LEVEL_INFO, F("[P150] DUCO RF GW: Sent command for 'disjoin' to DUCO unit"));
-				printWebString += F("[P150] DUCO RF GW: Sent command for 'disjoin' to DUCO unit");
+				addLog(LOG_LEVEL_INFO, PLUGIN_LOG_PREFIX_150 + "Sent command for 'disjoin' to DUCO unit");
+				printWebString += PLUGIN_LOG_PREFIX_150 + "Sent command for 'disjoin' to DUCO unit";
 				PLUGIN_150_rf.sendDisjoinPacket();
 				success = true;
 			}
@@ -293,9 +305,11 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
         addFormTextBox( F("Network ID (HEX)"), F("PLUGIN_150_NETWORKID"), tempNetworkId, 8);
 
 		char tempDeviceAddress[3];
-		sprintf(&tempDeviceAddress[0],"%d", PLUGIN_150_ExtraSettings.deviceAddress);
+		sprintf(&tempDeviceAddress[0],"%d", PCONFIG(P150_CONFIG_DEVICE_ADDRESS));
 
         addFormTextBox( F("Device Address"), F("PLUGIN_150_DEVICEADDRESS"), tempDeviceAddress, 3);
+		addFormCheckBox(F("Log rf messages to syslog"), F("Plugin150_log_rf"), PCONFIG(P150_CONFIG_LOG_RF));
+
         success = true;
         break;
     }
@@ -313,7 +327,9 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 		Serial.println(PLUGIN_150_ExtraSettings.networkId[2], HEX);
 		Serial.println(PLUGIN_150_ExtraSettings.networkId[3], HEX);
 
-		PLUGIN_150_ExtraSettings.deviceAddress = atoi(WebServer.arg(F("PLUGIN_150_DEVICEADDRESS")).c_str());
+		PCONFIG(P150_CONFIG_DEVICE_ADDRESS) = atoi(WebServer.arg(F("PLUGIN_150_DEVICEADDRESS")).c_str());
+        PCONFIG(P150_CONFIG_LOG_RF) = isFormItemChecked(F("Plugin150_log_rf"));
+
 
 		SaveCustomTaskSettings(event->TaskIndex, (byte*)&PLUGIN_150_ExtraSettings, sizeof(PLUGIN_150_ExtraSettings));
 		success = true;
@@ -324,9 +340,6 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 
 return success;
 } 
-
-
-
 
 
 
@@ -344,9 +357,9 @@ void PLUGIN_150_DUCOcheck() {
 	}
 	
 	noInterrupts();
-	addLog(LOG_LEVEL_DEBUG,F("[P150] DUCO RF GW: RF signal received"));
+	addLog(LOG_LEVEL_DEBUG,PLUGIN_LOG_PREFIX_150 + "RF signal received");
 
-	if (PLUGIN_150_rf.checkForNewPacket()){
+	if (PLUGIN_150_rf.checkForNewPacket(Plugin_150_logRF)){
 		int ventilationState = PLUGIN_150_rf.getCurrentVentilationMode();
 
         //  convert modbus status to "normal" duco status numbers
@@ -363,12 +376,17 @@ void PLUGIN_150_DUCOcheck() {
 
 		uint8_t numberOfLogMessages = PLUGIN_150_rf.getNumberOfLogMessages();
 		for(int i=0; i< numberOfLogMessages;i++){
-			addLog(LOG_LEVEL_INFO, PLUGIN_150_rf.getLogMessage(i));
+			addLog(LOG_LEVEL_INFO, PLUGIN_LOG_PREFIX_150 + PLUGIN_150_rf.getLogMessage(i));
 		}
 		
 		// If new package is arrived while reading FIFO CC1101 there is no new interrupt
-		if(PLUGIN_150_rf.checkForNewPacketInRXFifo()){
-			addLog(LOG_LEVEL_DEBUG, F("[P150] DUCO RF GW: Bytes left in RX FIFO"));
+		uint8_t bytesInFifo = PLUGIN_150_rf.checkForBytesInRXFifo();
+		if(bytesInFifo > 0){
+			//addLog(LOG_LEVEL_DEBUG, F("[P150] DUCO RF GW: Bytes left in RX FIFO"));
+  			char logBuf[40];
+			snprintf(logBuf, sizeof(logBuf), "%u bytes left in RX FIFO", bytesInFifo);
+   			addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_150 + logBuf);
+
 			PLUGIN_150_DUCOinterrupt();
 		}
 	}
@@ -378,7 +396,7 @@ void PLUGIN_150_DUCOcheck() {
   
 void PLUGIN_150_Publishdata(struct EventStruct *event) {
     UserVar[event->BaseVarIndex]=PLUGIN_150_State;
-    String log = F("[P150] DUCO RF GW: State: ");
+    String log = PLUGIN_LOG_PREFIX_150 + " State: ";
     log += UserVar[event->BaseVarIndex];
     addLog(LOG_LEVEL_DEBUG, log);
 }

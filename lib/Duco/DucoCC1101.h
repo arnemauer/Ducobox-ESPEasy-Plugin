@@ -74,6 +74,7 @@ class DucoCC1101 : protected CC1101
 		//settings
 		uint8_t sendTries;														//number of times a command is send at one button press
 		
+		void arrayToString(byte array[], unsigned int len, char buffer[]);
 
 
 		uint8_t deviceAddress;
@@ -149,8 +150,9 @@ class DucoCC1101 : protected CC1101
 		void sendJoinPacket();
 		void sendDisjoinPacket();
 		//receive
-		bool checkForNewPacket();												//check RX fifo for new data
+		bool checkForNewPacket(bool logRFMessages);												//check RX fifo for new data
 		bool checkForNewPacketInRXFifo();
+		uint8_t checkForBytesInRXFifo();
 
 		void requestVentilationMode(uint8_t ventilationMode, uint8_t percentage, uint8_t temp);
 
@@ -181,7 +183,8 @@ class DucoCC1101 : protected CC1101
 		void processNetworkPacket();
 
 		uint8_t updateMessageCounter();
-			
+		uint8_t getRssi();
+
 		//parse received message
 		void parseReceivedPackets();
 		void parseMessageCommand();
