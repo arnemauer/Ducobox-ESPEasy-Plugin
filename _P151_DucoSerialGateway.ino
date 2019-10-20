@@ -26,6 +26,8 @@ const char *answerReadNetwork = "network\r";
 const char ventilationColumnName[] = "%dbt";
 const char ducoboxStatusColumnName[] = "stat";
 
+bool Plugin_151_LED_status=false; // false = off, true=on
+
 const uint8_t DucoStatusModes [13][5] = 
 {
    {0, 0x41, 0x55, 0x54, 0x4f},    // 0 -> "auto" = AutomaticMode;
@@ -62,7 +64,7 @@ typedef enum {
 
 boolean Plugin_151(byte function, struct EventStruct *event, String& string)
 {
-  boolean success = false;
+    boolean success = false;
 
   switch (function)
   {
@@ -97,6 +99,12 @@ boolean Plugin_151(byte function, struct EventStruct *event, String& string)
         break;
       }
 
+	case PLUGIN_GET_DEVICEGPIONAMES:
+      {
+        event->String1 = formatGpioName_output(F("Status LED"));
+        break;
+      }
+
     case PLUGIN_WEBFORM_LOAD:
       {
 
@@ -127,6 +135,12 @@ boolean Plugin_151(byte function, struct EventStruct *event, String& string)
             Serial.begin(115200, SERIAL_8N1);
             Plugin_151_init = true;
 
+		    if(Settings.TaskDevicePin2[event->TaskIndex] != -1){
+			    pinMode(Settings.TaskDevicePin2[event->TaskIndex], OUTPUT);
+                digitalWrite(Settings.TaskDevicePin2[event->TaskIndex], HIGH);
+		    }
+
+
             p151_duco_data[P151_DATA_FLOW] = NAN; // flow %
             p151_duco_data[P151_DATA_STATUS] = NAN; // DUCO_STATUS
 
@@ -146,6 +160,12 @@ boolean Plugin_151(byte function, struct EventStruct *event, String& string)
       {
        
         if (Plugin_151_init){
+
+            if(Settings.TaskDevicePin2[event->TaskIndex] != -1){
+		        digitalWrite(Settings.TaskDevicePin2[event->TaskIndex], LOW);
+		        Plugin_151_LED_status = true;
+	        }
+
                 addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_151 + "read networkList");
                 readNetworkList();
            
@@ -167,6 +187,20 @@ boolean Plugin_151(byte function, struct EventStruct *event, String& string)
         success = true;
         break;
       }
+
+      
+      case PLUGIN_TEN_PER_SECOND: {
+		// set statusled off
+		if(Settings.TaskDevicePin2[event->TaskIndex] != -1){
+			if(Plugin_151_LED_status){
+				digitalWrite(Settings.TaskDevicePin2[event->TaskIndex], HIGH);
+				Plugin_151_LED_status = false;
+			}
+		}
+      }
+
+
+
   }
   return success;
 }

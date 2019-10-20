@@ -128,7 +128,9 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 
 			Plugin_150_LED_pin = Settings.TaskDevicePin2[event->TaskIndex];
 		if(Plugin_150_LED_pin != -1){
-			pinMode(Plugin_150_LED_pin, OUTPUT);			
+			pinMode(Plugin_150_LED_pin, OUTPUT);	
+			digitalWrite(Plugin_150_LED_pin, HIGH);
+		
 		}
 
 		String log3 = PLUGIN_LOG_PREFIX_150 + "Interrupt cc1101 initialized: IRQ-pin ";
