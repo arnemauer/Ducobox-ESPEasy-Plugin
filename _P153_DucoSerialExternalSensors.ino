@@ -151,7 +151,6 @@ boolean Plugin_153(byte function, struct EventStruct *event, String& string)
 
         PCONFIG(P153_CONFIG_LOG_SERIAL) = isFormItemChecked(F("Plugin153_log_serial"));
 
-
         success = true;
         break;
       }
@@ -168,7 +167,6 @@ boolean Plugin_153(byte function, struct EventStruct *event, String& string)
             addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_153 + logBuf);
             */
 
-
             Serial.begin(115200, SERIAL_8N1);
             Plugin_153_init = true;
 
@@ -183,7 +181,7 @@ boolean Plugin_153(byte function, struct EventStruct *event, String& string)
     case PLUGIN_READ:
       {
         if (Plugin_153_init){
-                addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_153 + "read external duco sensors");
+                addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_153 + "Read external duco sensors");
 
                 if(PCONFIG(P153_CONFIG_DEVICE_TYPE) == P153_DUCO_DEVICE_CO2){
                   if(Plugin_153_toggle_sensor){
@@ -285,7 +283,6 @@ void readExternalSensors(uint8_t dataType, int nodeAddress){
 	              char *token = strtok(buf, "\r");
                 unsigned int raw_value;
                 char logBuf[30];
-                char bigLogBuf[200];
 
                 while (token != NULL) {
 

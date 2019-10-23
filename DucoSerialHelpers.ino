@@ -83,7 +83,7 @@ int DucoSerialSendCommand(String logPrefix, const char *command)
     // DUCO throws random debug info on the serial, lets flush input buffer.
     DucoSerialFlush();
 
-    for (int m = 0; m < strlen(command); m++) {
+    for (unsigned m = 0; m < strlen(command); m++) {
        delay(10); // 20ms = buffer overrun while reading serial data. // ducosoftware uses +-15ms.
        int bytesSend = Serial.write(command[m]);
        if(bytesSend != 1){

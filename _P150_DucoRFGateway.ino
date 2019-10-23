@@ -317,21 +317,14 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
     }
 
     case PLUGIN_WEBFORM_SAVE:{
-		byte CardNumberByte[4];
 		unsigned long number = strtoul( WebServer.arg(F("PLUGIN_150_NETWORKID")).c_str(), nullptr, 16);
 		for(int i=3; i>=0; i--){    // start with lowest byte of number
 			PLUGIN_150_ExtraSettings.networkId[i] = number & 0xFF;  // or: = byte( number);
 			number >>= 8;            // get next byte into position
 		}
-			
-		Serial.println(PLUGIN_150_ExtraSettings.networkId[0], HEX);
-		Serial.println(PLUGIN_150_ExtraSettings.networkId[1], HEX);
-		Serial.println(PLUGIN_150_ExtraSettings.networkId[2], HEX);
-		Serial.println(PLUGIN_150_ExtraSettings.networkId[3], HEX);
 
 		PCONFIG(P150_CONFIG_DEVICE_ADDRESS) = atoi(WebServer.arg(F("PLUGIN_150_DEVICEADDRESS")).c_str());
         PCONFIG(P150_CONFIG_LOG_RF) = isFormItemChecked(F("Plugin150_log_rf"));
-
 
 		SaveCustomTaskSettings(event->TaskIndex, (byte*)&PLUGIN_150_ExtraSettings, sizeof(PLUGIN_150_ExtraSettings));
 		success = true;
@@ -377,8 +370,9 @@ void PLUGIN_150_DUCOcheck() {
         }
 
 		uint8_t numberOfLogMessages = PLUGIN_150_rf.getNumberOfLogMessages();
+
 		for(int i=0; i< numberOfLogMessages;i++){
-			addLog(LOG_LEVEL_INFO, PLUGIN_LOG_PREFIX_150 + PLUGIN_150_rf.getLogMessage(i));
+			addLog(LOG_LEVEL_INFO, PLUGIN_LOG_PREFIX_150 + PLUGIN_150_rf.logMessages[i]);
 		}
 		
 		// If new package is arrived while reading FIFO CC1101 there is no new interrupt

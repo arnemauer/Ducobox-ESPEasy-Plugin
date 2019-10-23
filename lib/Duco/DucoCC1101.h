@@ -109,7 +109,10 @@ class DucoCC1101 : protected CC1101
 		uint8_t testCounter;
 		uint8_t ducoboxLastRssiByte;
 
-		String logMessages[10]; // to store some log messages from library
+		//String logMessages[10]; // to store some log messages from library
+		#define NUMBER_OF_LOG_STRING 10
+		#define MAX_LOG_STRING_SIZE 600
+
 		uint8_t numberOfLogmessages = 0;
 		String logline; // used to build a log message
 
@@ -141,8 +144,8 @@ class DucoCC1101 : protected CC1101
 		}
 		uint8_t* getnetworkID() { return networkId; }	
 
-		String getLogMessage(uint8_t messageNumber);
 		uint8_t getNumberOfLogMessages();
+		char logMessages[NUMBER_OF_LOG_STRING][MAX_LOG_STRING_SIZE];
 
 
 		void checkForAck();
@@ -167,7 +170,7 @@ class DucoCC1101 : protected CC1101
 		DucoCC1101( const DucoCC1101 &c);
 		DucoCC1101& operator=( const DucoCC1101 &c);
 
-		void setLogMessage(String newLogMessage);
+		void setLogMessage(const char *newLogMessage);
 
 
 

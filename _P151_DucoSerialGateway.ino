@@ -215,9 +215,6 @@ boolean Plugin_151(byte function, struct EventStruct *event, String& string)
 unsigned int getColumnNumberByColumnName(const char *columnName){
     int currentRow = 3; // row with columnnames
     int separatorCounter = 0; 
-    int columnNumber = 0;
-    //bool startColumnNameCheck = true;
-
     int charCount = strlen(columnName);
 
     // loop through all characters of row 3 (row with columnnames)
@@ -250,7 +247,6 @@ unsigned int getValueByNodeNumberAndColumn(uint8_t ducoNodeNumber,uint8_t ducoCo
 
     unsigned int start_byte_number = 0;
     unsigned int end_byte_number = 0;
-    unsigned int row_number;
     for (int currentRow = 4; currentRow <= duco_serial_rowCounter; currentRow++) {
         unsigned int number_size = 0;
         unsigned int row_node_number = 0;
@@ -278,7 +274,7 @@ unsigned int getValueByNodeNumberAndColumn(uint8_t ducoNodeNumber,uint8_t ducoCo
 
     if(start_byte_number > 0){
         unsigned int column_counter = 0;
-        for (int i = start_byte_number; i <= end_byte_number; i++) { // smaller then duco_serial_bytes_read OR... the next row start?
+        for (unsigned int i = start_byte_number; i <= end_byte_number; i++) { // smaller then duco_serial_bytes_read OR... the next row start?
             if(duco_serial_buf[i] == 0x7c){
                 column_counter++;
                 if(column_counter >= ducoColumnNumber){
@@ -486,7 +482,7 @@ int logArray(uint8_t array[], int len, int fromByte) {
     String logstring = PLUGIN_LOG_PREFIX_151 + F("Pakket ontvangen: ");
     char lossebyte[6];
 
-    for (int i = fromByte; i <= len-1; i++) {
+    for (unsigned int i = fromByte; i <= len-1; i++) {
 
         sprintf_P(lossebyte, PSTR("%02X"), array[i]);
         logstring += lossebyte;
