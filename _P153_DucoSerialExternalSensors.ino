@@ -126,7 +126,7 @@ boolean Plugin_153(byte function, struct EventStruct *event, String& string)
           addFormNumericBox(F("IDX Sensor relative humidity"), F("Plugin_153_IDX2"), PCONFIG(P153_CONFIG_IDX_SENSOR_RH), 0, 5000);
         }
 
-        addFormCheckBox(F("Log serial messages to syslog"), F("Plugin151_log_serial"), PCONFIG(P153_CONFIG_LOG_SERIAL));
+        addFormCheckBox(F("Log serial messages to syslog"), F("Plugin153_log_serial"), PCONFIG(P153_CONFIG_LOG_SERIAL));
 
         success = true;
         break;
