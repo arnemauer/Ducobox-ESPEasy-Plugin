@@ -5,15 +5,23 @@
 //#######################################################################################################
 
 // define buffers, large, indeed. The entire datagram checksum will be checked at once
-#define DUCO_SERIAL_BUFFER_SIZE 750
-//#define NETBUF_SIZE 600
+#define DUCO_SERIAL_BUFFER_SIZE 180 // duco networklist is max 150 chars
 uint8_t duco_serial_buf[DUCO_SERIAL_BUFFER_SIZE];
 unsigned int duco_serial_bytes_read = 0;
 
-int duco_serial_stopwordCounter = 0; // 0x0d 0x20 0x20 0x0d 0x3e 0x20
+unsigned int duco_serial_stopwordCounter = 0; // 0x0d 0x20 0x20 0x0d 0x3e 0x20
 
-unsigned int duco_serial_rows[15]; // byte number where a new row starts
-unsigned int duco_serial_rowCounter = 0;
+//unsigned int duco_serial_rows[15]; // byte number where a new row starts
+//uint8_t duco_serial_rowCounter = 0;
+
+typedef enum {
+    DUCO_MESSAGE_END = 1, // status after receiving the end of a message (0x0d 0x20 0x20 )
+    //P153_MESSAGE_END_STEP2 = 2,  //step 2 (0x0d 0x3e 0x20)
+    DUCO_MESSAGE_ROW_END = 2, // end of a row
+    DUCO_MESSAGE_TIMEOUT = 3,
+    DUCO_MESSAGE_ARRAY_OVERFLOW = 4,
+
+} DucoSerialMessageStatus;
 
 /**
  * Send an updated value to the various controllers.
@@ -121,50 +129,66 @@ void DucoSerialFlush()
         }
 }  
 
-bool DucoSerialReceiveData(String logPrefix, long timeout, bool verbose)
+// dont use this function if the serial messages is bigger than 1000 characters!
+uint8_t DucoSerialReceiveRow(String logPrefix, long timeout, bool verbose)
 {
     long start = millis();
     duco_serial_stopwordCounter = 0;
     duco_serial_bytes_read = 0; // reset bytes read counter
-    duco_serial_rows[0] = 0; // row zero = command in answer from duco
-    duco_serial_rowCounter = 1; 
+    uint8_t status = 0;
 
     // Handle RESPONSE, read serial till we received the stopword or a timeout occured.
-    while (((millis() - start) < timeout) && (duco_serial_stopwordCounter < 6)) {
-        if (Serial.available() > 0) {
+    while (((millis() - start) < timeout) && (status < 1) && (duco_serial_bytes_read < DUCO_SERIAL_BUFFER_SIZE) ) {
+       if (Serial.available() > 0) {
             duco_serial_buf[duco_serial_bytes_read] = Serial.read();
 
-            // check if there is a new row, 0x0d = new row.
-            if(duco_serial_buf[duco_serial_bytes_read] == 0x0d){
-                duco_serial_rows[duco_serial_rowCounter] = duco_serial_bytes_read;
-                duco_serial_rowCounter++;
+            if (duco_serial_buf[duco_serial_bytes_read] == 0x0d){
+                status = DUCO_MESSAGE_ROW_END;
+            }    
+
+            if(duco_serial_bytes_read == 1){
+                if( (duco_serial_buf[0] == 0x3e) && (duco_serial_buf[1] == 0x20) ){  // 0x0d 0x20 0x20 0x0d 0x3e 0x20
+                    status = DUCO_MESSAGE_END;
+                }
             }
 
-            if ((duco_serial_buf[duco_serial_bytes_read] == 0x0d) || (duco_serial_buf[duco_serial_bytes_read] == 0x20) || (duco_serial_buf[duco_serial_bytes_read] == 0x3e)) {
-                duco_serial_stopwordCounter++; // character of stopwoord found 
-            }else{
-                duco_serial_stopwordCounter = 0;
-            }            
             duco_serial_bytes_read++;
         }
-
     }// end while
 
-    if(duco_serial_stopwordCounter == 6){
-        if (verbose) {
-            addLog(LOG_LEVEL_INFO, logPrefix + "Package received with stopword.");
-        }
-        return true;
-    }else{
-        // timout occurred, stopword not found!
-        if (verbose) {
-            addLog(LOG_LEVEL_INFO, logPrefix + "Package receive timeout.");
-        }
-        DucoSerialFlush();
-        return false;
-    }
 
+    if(status == 0){ // if status isnt DUCO_MESSAGE_ROW_END OR DUCO_MESSAGE_END, check buffer size or timeout.
+        if(duco_serial_bytes_read >= DUCO_SERIAL_BUFFER_SIZE){
+            status = DUCO_MESSAGE_ARRAY_OVERFLOW;
+        }else{
+            // timout occurred
+            if (verbose) {
+                addLog(LOG_LEVEL_INFO, logPrefix + "Package receive timeout.");
+            }
+            status = DUCO_MESSAGE_TIMEOUT;
+            DucoSerialFlush();
+        }
+    }
+    
+    return status;
 }
+
+
+void DucoThrowErrorMessage(String logPrefix, uint8_t messageStatus){
+    switch(messageStatus){
+        case DUCO_MESSAGE_END:
+            addLog(LOG_LEVEL_DEBUG, logPrefix + "End of message received.");
+        break;
+        case DUCO_MESSAGE_TIMEOUT:
+            addLog(LOG_LEVEL_DEBUG, logPrefix + "Serial message timeout.");
+        break;
+        case DUCO_MESSAGE_ARRAY_OVERFLOW:
+            addLog(LOG_LEVEL_DEBUG, logPrefix + "Serial message array overflow.");
+        break;
+    }
+    return;
+}
+
 
 bool DucoSerialCheckCommandInResponse(String logPrefix, const char* command, bool verbose)
 {
@@ -181,4 +205,31 @@ bool DucoSerialCheckCommandInResponse(String logPrefix, const char* command, boo
         }
         return false;
     }
+}
+
+
+int DucoSerialLogArray(String logPrefix, uint8_t array[], int len, int fromByte)
+{
+   unsigned int counter = 1;
+
+  String logstring = logPrefix + F("Pakket ontvangen: ");
+  char lossebyte[6];
+
+  for (unsigned int i = fromByte; i <= len - 1; i++)
+  {
+
+    sprintf_P(lossebyte, PSTR("%02X"), array[i]);
+    logstring += lossebyte;
+    if (((counter * 60) + fromByte) == i)
+    {
+      counter++;
+      logstring += F(">");
+      addLog(LOG_LEVEL_INFO, logstring);
+      delay(50);
+      logstring = F("");
+    }
+  }
+  logstring += F(" END");
+  addLog(LOG_LEVEL_INFO, logstring);
+  return -1;
 }

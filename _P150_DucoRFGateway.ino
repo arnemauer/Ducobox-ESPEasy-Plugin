@@ -11,30 +11,23 @@
 #include <SPI.h>
 #include "DucoCC1101.h"
 #include "DucoPacket.h"
-#include <Ticker.h>
 
 //This extra settings struct is needed because the default settingsstruct doesn't support strings
 struct PLUGIN_150_ExtraSettingsStruct
 {	uint8_t networkId[4];
-//	uint8_t deviceAddress;
 } PLUGIN_150_ExtraSettings;
 
-
 DucoCC1101 PLUGIN_150_rf;
-void PLUGIN_150_DUCOinterrupt() ICACHE_RAM_ATTR;
 
 // extra for interrupt handling
-Ticker PLUGIN_150_DUCOticker;
-int PLUGIN_150_State=0; // after startup it is assumed that the fan is running low
+int PLUGIN_150_State=0; // after startup it is assumed that the fan is running in automatic mode
 int PLUGIN_150_OldState=1;
 
 int8_t Plugin_150_IRQ_pin=-1;
 int8_t Plugin_150_LED_pin=-1;
 bool Plugin_150_LED_status=false; // false = off, true=on
 bool PLUGIN_150_InitRunned = false;
-
 bool Plugin_150_logRF = true;
-
 
 #define PLUGIN_150
 #define PLUGIN_ID_150         150
@@ -59,8 +52,8 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 	case PLUGIN_DEVICE_ADD:
 		{
 			Device[++deviceCount].Number = PLUGIN_ID_150;
-            Device[deviceCount].Type = DEVICE_TYPE_DUAL;
-            Device[deviceCount].VType = SENSOR_TYPE_SINGLE;
+         Device[deviceCount].Type = DEVICE_TYPE_DUAL;
+         Device[deviceCount].VType = SENSOR_TYPE_SINGLE;
 			Device[deviceCount].Ports = 0;
 			Device[deviceCount].PullUpOption = false;
 			Device[deviceCount].InverseLogicOption = false;
@@ -114,38 +107,40 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 		PLUGIN_150_rf.setDeviceAddress(PCONFIG(P150_CONFIG_DEVICE_ADDRESS));
 		PLUGIN_150_rf.setNetworkId(PLUGIN_150_ExtraSettings.networkId);
 
-		String log4 = PLUGIN_LOG_PREFIX_150 + "Values set from config: DeviceID: ";
+		String log4 = PLUGIN_LOG_PREFIX_150 + "Values set from config. DeviceID: ";
 		log4 += PLUGIN_150_rf.getDeviceAddress();
-		log4 += F(" and networkId");
+		log4 += F(" and networkId: ");
 		for (uint8_t i=0; i<=3; i++){
 			log4 += String(PLUGIN_150_ExtraSettings.networkId[i], HEX);
-			log4 +=F(",");
 		}
 		addLog(LOG_LEVEL_INFO, log4);
 
+		// set pinmode for CC1101 interrupt pin
 		Plugin_150_IRQ_pin = Settings.TaskDevicePin1[event->TaskIndex];
 		pinMode(Plugin_150_IRQ_pin, INPUT);
 
-			Plugin_150_LED_pin = Settings.TaskDevicePin2[event->TaskIndex];
+		// set pinmode for status led
+		Plugin_150_LED_pin = Settings.TaskDevicePin2[event->TaskIndex];
 		if(Plugin_150_LED_pin != -1){
 			pinMode(Plugin_150_LED_pin, OUTPUT);	
 			digitalWrite(Plugin_150_LED_pin, HIGH);
-		
 		}
 
+		// debug information about interrupt pin
 		String log3 = PLUGIN_LOG_PREFIX_150 + "Interrupt cc1101 initialized: IRQ-pin ";
 		log3 += Plugin_150_IRQ_pin;
 		addLog(LOG_LEVEL_INFO, log3);
 
+		// start initiating the CC1101 radio module
 		PLUGIN_150_rf.initReceive();
 
-		// check if succesfully initialised radio cc1101
+		// check if succesfully initialised CC1101 radio module
 		switch(PLUGIN_150_rf.getDucoDeviceState()){
 			case 0x14: { // initialistion succesfull!
 				PLUGIN_150_InitRunned=true;
 				success = true;
 				addLog(LOG_LEVEL_INFO, PLUGIN_LOG_PREFIX_150 + "CC1101 868Mhz transmitter initialized");
-				attachInterrupt(Plugin_150_IRQ_pin, PLUGIN_150_DUCOinterrupt, RISING);
+				attachInterrupt(Plugin_150_IRQ_pin, PLUGIN_150_DUCOcheck, RISING);
 				break;
 			}
 			case 0x15: {
@@ -159,11 +154,12 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 
 		}
 
-
-
-
 		if(PLUGIN_150_rf.getDucoDeviceState() == 0x14){
 			success = true;
+
+			// send values after init
+			PLUGIN_150_Publishdata(event);
+        		sendData(event);
 
 		}else{
 			// initialisation failed...
@@ -178,6 +174,11 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 		addLog(LOG_LEVEL_INFO, PLUGIN_LOG_PREFIX_150 + "EXIT PLUGIN_150");
 		//remove interupt when plugin is removed
 		detachInterrupt(Plugin_150_IRQ_pin);
+
+		PLUGIN_150_rf.reset(); // reset CC1101
+      clearPluginTaskData(event->TaskIndex); // clear plugin taskdata
+		ClearCustomTaskSettings(event->TaskIndex); // clear networkID settings
+
 		success = true;
 		break;
 	}
@@ -200,6 +201,11 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 			memcpy(PLUGIN_150_ExtraSettings.networkId, PLUGIN_150_rf.getnetworkID(), 4); //convert char array to uint8_t
 			PCONFIG(P150_CONFIG_DEVICE_ADDRESS) = PLUGIN_150_rf.getDeviceAddress();
 			SaveCustomTaskSettings(event->TaskIndex, (byte*)&PLUGIN_150_ExtraSettings, sizeof(PLUGIN_150_ExtraSettings));
+			
+			uint8_t numberOfLogMessages = PLUGIN_150_rf.getNumberOfLogMessages();
+			for(int i=0; i< numberOfLogMessages;i++){
+				addLog(LOG_LEVEL_INFO, PLUGIN_LOG_PREFIX_150 + PLUGIN_150_rf.logMessages[i]);
+			}
 		}
 		
 		interrupts();
@@ -212,19 +218,17 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
     case PLUGIN_ONCE_A_SECOND:
     {
 		      
-      //Publish new data when vars are changed or init has runned or timer is running (update every 2 sec)
-      if  ((PLUGIN_150_OldState!=PLUGIN_150_State) || PLUGIN_150_InitRunned)
+      //Publish new data when vars are changed or init has runned
+      if  (PLUGIN_150_OldState!=PLUGIN_150_State)
       {
 		addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_150 + "ventilation mode changed -> UPDATE by PLUGIN_ONCE_A_SECOND");
 		PLUGIN_150_Publishdata(event);
-        sendData(event);
+        	sendData(event);
 
-		//reset flag set by init
-		PLUGIN_150_InitRunned = false;
-      }  
+      	    	 //Remeber current state for next cycle
+      		PLUGIN_150_OldState=PLUGIN_150_State;
 
-      //Remeber current state for next cycle
-      PLUGIN_150_OldState=PLUGIN_150_State;
+      }
 	  success = true;
       break;
     }
@@ -245,8 +249,8 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 
 		if (cmd.equalsIgnoreCase(F("VENTMODE"))) {
 			//override ventilation with percentage
-			String param2 = parseString(tmpString, 3);
-			uint8_t percentage = atoi(param2.c_str());
+			String param2 = parseString(tmpString, 3); 
+			uint8_t percentage = atoi(param2.c_str()); // if empty percentage will be 0
 
 			uint8_t ventilationMode = 0x99;
 			if (param1.equalsIgnoreCase(F("AUTO")))	{ 		  ventilationMode = 0x00;
@@ -267,8 +271,7 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 				addLog(LOG_LEVEL_INFO, log5);
 				printWebString += log5;
 
-				PLUGIN_150_rf.requestVentilationMode(ventilationMode,percentage,0xD2); // temp=210 = 21.0C
-				
+				PLUGIN_150_rf.requestVentilationMode(ventilationMode,percentage,0xD2); // temp=210 = 21.0C	
 			}
 
 			success = true;
@@ -287,11 +290,95 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 				printWebString += PLUGIN_LOG_PREFIX_150 + "Sent command for 'disjoin' to DUCO unit";
 				PLUGIN_150_rf.sendDisjoinPacket();
 				success = true;
+			}		
+		else if (cmd.equalsIgnoreCase(F("INSTALLERMODE")))
+			{
+			uint8_t action = atoi(param1.c_str());
+			int ventilationState = PLUGIN_150_rf.getCurrentVentilationMode();
+
+			if(param1.equalsIgnoreCase(F("OFF"))){
+				PLUGIN_150_rf.disableInstallerMode();
+				addLog(LOG_LEVEL_INFO, PLUGIN_LOG_PREFIX_150 + "Sent command for disabling installermode.");
+				printWebString += PLUGIN_LOG_PREFIX_150 + "Sent command for disabling installermode.";
+				success = true;
+			}else if(param1.equalsIgnoreCase(F("ON"))){
+				PLUGIN_150_rf.requestVentilationMode(ventilationState, 0x00, 0xD2, true); // temp=210 = 21.0C
+				addLog(LOG_LEVEL_INFO, PLUGIN_LOG_PREFIX_150 + "Sent command for enabling installermode.");
+				printWebString += PLUGIN_LOG_PREFIX_150 + "Sent command for enabling installermode.";
+				success = true;
+			}
+
+
+			}
+
+			uint8_t numberOfLogMessages = PLUGIN_150_rf.getNumberOfLogMessages();
+			for(int i=0; i< numberOfLogMessages;i++){
+				addLog(LOG_LEVEL_INFO, PLUGIN_LOG_PREFIX_150 + PLUGIN_150_rf.logMessages[i]);
 			}
 			
 		 
 	  break; 
 	}
+
+  	case PLUGIN_WEBFORM_SHOW_VALUES: {
+
+		String ventMode = "";
+		if(PLUGIN_150_InitRunned){
+			switch(PLUGIN_150_State){
+ 				case 0:  {  ventMode = "Automatic (0)"; break; } // modbus 0 = auto                   convert to duco 0  = "auto" = AutomaticMode;
+				case 21: {  ventMode = "Boost10min (21)"; break; } // modbus 1 = 10 minuten hoogstand   convert to duco 21 = "aut1" = Boost10min;
+				case 22: {  ventMode = "Boost20min (22)"; break; } // modbus 2 = 20 minuten hoogstand   convert to duco 22 = "aut2" = Boost20min;
+				case 23: {  ventMode = "Boost30min (23)"; break; } // modbus 3 = 30 minuten hoogstand   convert to duco 23 = "aut3" = Boost30min;
+				case 1:  {  ventMode = "ManualMode1 (1)"; break; } // modbus 4 = Manuele laagstand      convert to duco 1  = "man1" = ManualMode1;
+				case 2:  {  ventMode = "ManualMode2 (2)"; break; } // modbus 5 = Manuele middenstand    convert to duco 2  = "man2" = ManualMode2; 
+				case 3:  {  ventMode = "ManualMode3 (3)"; break; } // modbus 6 = Manuele hoogstand      convert to duco 3  = "man3" = ManualMode3; 
+				case 4:  {  ventMode = "EmptyHouse (4)"; break; } // modbus 7 = Niet-thuis-stand       convert to duco 4  = "empt" = EmptyHouse;
+				default: {  ventMode = "NA"; break; };
+			}
+		}else{
+			ventMode = "Disabled"; 
+		}
+		// can't use pluginWebformShowValue because ajax will refresh the value with original value (number)
+		//addHtml(pluginWebformShowValue(event->TaskIndex, 0, F("Ventilationmode"), ventMode));
+
+		addHtml(F("<div class=\"div_l\" id=\"installermode\">Ventilationmode:</div>"));
+		addHtml(F("<div class=\"div_r\" id=\"ventilationModeValue\">"));
+		addHtml(ventMode);
+		addHtml(F("</div>"));
+		addHtml(F("<div class=\"div_br\"></div>"));
+
+		if( PLUGIN_150_InitRunned ){
+			if(PCONFIG(P150_CONFIG_DEVICE_ADDRESS) != 0){
+
+				if(PLUGIN_150_rf.getInstallerModeActive()){
+					addHtml(F("<div class=\"div_l\" id=\"installermode\">Installermode (<a style='color:#07D; text-decoration: none;' href='/tools?cmd=INSTALLERMODE,OFF'>deactivate</a>):</div>"));
+					addHtml(F("<div class=\"div_r\" style=\"background-color: #c00000;\" id=\"installermodeactive\">ACTIVE</div>"));
+				}else{
+					addHtml(F("<div class=\"div_l\" id=\"installermode\">Installermode (<a style='color:#07D; text-decoration: none;' href='/tools?cmd=INSTALLERMODE,ON'>activate</a>):</div>"));
+					addHtml(F("<div class=\"div_r\" style=\"background-color: #080;\" id=\"installermodenactive\">NOT ACTIVE</div>"));
+				}
+				addHtml(F("<div class=\"div_br\"></div>"));
+			}
+
+			addHtml(F("<div class=\"div_l\" id=\"installermode\">Actions:</div>"));
+
+			// if init runned and device has no addressid than show join button
+			if(PCONFIG(P150_CONFIG_DEVICE_ADDRESS) == 0 ){
+				addHtml(F("<div class=\"div_r\" style=\"background-color: #07D;\"><a style='color:#fff; text-decoration: none;' href='/tools?cmd=JOIN'>Join</a></div>"));
+			}else{
+				addHtml(F("<div class=\"div_r\" style=\"background-color: #07D;\"><a style='color:#fff; text-decoration: none;' href='/tools?cmd=VENTMODE,AUTO'>AUTO</a></div>"));
+				addHtml(F("<div class=\"div_r\" style=\"background-color: #07D;\"><a style='color:#fff; text-decoration: none;' href='/tools?cmd=VENTMODE,LOW'>LOW</a></div>"));
+				addHtml(F("<div class=\"div_r\" style=\"background-color: #07D;\"><a style='color:#fff; text-decoration: none;' href='/tools?cmd=VENTMODE,MIDDLE'>MID</a></div>"));
+				addHtml(F("<div class=\"div_r\" style=\"background-color: #07D;\"><a style='color:#fff; text-decoration: none;' href='/tools?cmd=VENTMODE,HIGH'>HIGH</a></div>"));
+			}
+			addHtml(F("<div class=\"div_br\"></div>"));
+		}
+
+        	success = true; // The call to PLUGIN_WEBFORM_SHOW_VALUES should only return success = true when no regular values should be displayed
+
+		break;
+	}
+
 
 
     case PLUGIN_WEBFORM_LOAD: {
@@ -338,13 +425,9 @@ return success;
 
 
 
-void PLUGIN_150_DUCOinterrupt()
-{
-	PLUGIN_150_DUCOticker.once_ms(1, PLUGIN_150_DUCOcheck);	
-}
 
 
-void PLUGIN_150_DUCOcheck() {
+void ICACHE_RAM_ATTR PLUGIN_150_DUCOcheck() {
 
 	if(Plugin_150_LED_pin != -1){
 		digitalWrite(Plugin_150_LED_pin, LOW);
@@ -375,8 +458,9 @@ void PLUGIN_150_DUCOcheck() {
 			addLog(LOG_LEVEL_INFO, PLUGIN_LOG_PREFIX_150 + PLUGIN_150_rf.logMessages[i]);
 		}
 		
-		// If new package is arrived while reading FIFO CC1101 there is no new interrupt
-		uint8_t bytesInFifo = PLUGIN_150_rf.checkForBytesInRXFifo();
+		
+		/* REMOVE THIS! ESP keeps crashing because of to long interrupt
+		// If new package is arrived while reading FIFO CC1101 there is no new interrupt		uint8_t bytesInFifo = PLUGIN_150_rf.checkForBytesInRXFifo();
 		if(bytesInFifo > 0){
 			//addLog(LOG_LEVEL_DEBUG, F("[P150] DUCO RF GW: Bytes left in RX FIFO"));
   			char logBuf[40];
@@ -385,6 +469,7 @@ void PLUGIN_150_DUCOcheck() {
 
 			PLUGIN_150_DUCOinterrupt();
 		}
+		*/
 	}
 
 	interrupts();

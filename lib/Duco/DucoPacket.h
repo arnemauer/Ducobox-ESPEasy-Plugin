@@ -9,10 +9,12 @@
 class DucoPacket
 {
 	public:
-		uint8_t deviceIdReceiver;
-		uint8_t deviceIdSender;
-		uint8_t deviceIdReceiver2;
-		uint8_t deviceIdSender2;
+
+		uint8_t destinationAddress;   // destination address
+		uint8_t sourceAddress;     // source address
+		uint8_t originalDestinationAddress; // oringal destination address
+		uint8_t originalSourceAddress; // original source address
+
 		uint8_t networkId[4];
 
 		uint8_t messageType;

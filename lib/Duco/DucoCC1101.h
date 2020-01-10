@@ -107,7 +107,10 @@ class DucoCC1101 : protected CC1101
 		// 0x16 = initialisation failed stage 2 -> set RX mode failed or no response from cc1101
 
 		uint8_t testCounter;
-		uint8_t ducoboxLastRssiByte;
+		uint8_t lastRssiByte;
+
+		bool installerModeActive;
+
 
 		//String logMessages[10]; // to store some log messages from library
 		#define NUMBER_OF_LOG_STRING 10
@@ -124,6 +127,7 @@ class DucoCC1101 : protected CC1101
 		
 		//init
 		void init() { CC1101::init(); }											//init,reset CC1101
+		void reset();
 		void initReceive();
 		uint8_t getLastCounter() { return outDucoPacket.counter; }				//counter is increased before sending a command
 		void setSendTries(uint8_t sendTries) { this->sendTries = sendTries; }
@@ -158,7 +162,10 @@ class DucoCC1101 : protected CC1101
 		uint8_t checkForBytesInRXFifo();
 
 		void requestVentilationMode(uint8_t ventilationMode, uint8_t percentage, uint8_t temp);
+		void requestVentilationMode(uint8_t ventilationMode, uint8_t percentage, uint8_t temp, bool activateInstallerMode);
 
+		void disableInstallerMode();
+		bool getInstallerModeActive(){ return installerModeActive; }
 
 		DucoPacket getLastPacket() { return inDucoPacket; }						//retrieve last received/parsed packet from remote
 		uint8_t getLastInCounter() { return inDucoPacket.counter; }						//retrieve last received/parsed command from remote
@@ -192,6 +199,9 @@ class DucoCC1101 : protected CC1101
 		void parseReceivedPackets();
 		void parseMessageCommand();
 				
+		void repeatMessage();
+
+
 		void sendPing();
 		void sendConfirmationNewVentilationMode();
 		void sendNodeParameterValue();
@@ -207,6 +217,8 @@ class DucoCC1101 : protected CC1101
 		//send
 		void ducoToCC1101Packet(DucoPacket *duco, CC1101Packet *packet);
 		void prefillDucoPacket(DucoPacket *ducoOutPacket, uint8_t receiverAddress);
+		void prefillDucoPacket(DucoPacket *ducoOutPacket, uint8_t receiverAddress, uint8_t originalSourceAddress, uint8_t originalDestinationAddress );
+
 		void sendAck();
 		void waitForAck();
 		
