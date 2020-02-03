@@ -10,7 +10,6 @@
 #include "CC1101.h"
 #include "DucoPacket.h"
 
-
 #define DUCO_PARAMETER							0x05
 #define CC1101_WRITE_BURST						0x40
 #define CC1101_WRITE_BURST						0x40
@@ -110,11 +109,12 @@ class DucoCC1101 : protected CC1101
 		uint8_t lastRssiByte;
 
 		bool installerModeActive;
+		bool logRFMessages = false;
 
 
 		//String logMessages[10]; // to store some log messages from library
 		#define NUMBER_OF_LOG_STRING 10
-		#define MAX_LOG_STRING_SIZE 600
+		#define MAX_LOG_STRING_SIZE 250
 
 		uint8_t numberOfLogmessages = 0;
 		String logline; // used to build a log message
@@ -135,7 +135,9 @@ class DucoCC1101 : protected CC1101
 		uint8_t getCurrentVentilationMode() { return this->currentVentilationMode; }						//retrieve last received/parsed command from remote	
 		uint8_t getDucoDeviceState() { return this->ducoDeviceState; } // retrieve radio/duco state
 		
-
+		// 
+		void setLogRFMessages(bool logRFMessages){ this->logRFMessages = logRFMessages; }
+		bool getLogRFMessages() { return logRFMessages; }	
 
 
 		//deviceid
@@ -156,8 +158,13 @@ class DucoCC1101 : protected CC1101
 
 		void sendJoinPacket();
 		void sendDisjoinPacket();
+
+		uint8_t getMarcState(bool noLogMessage);
+
+
+
 		//receive
-		bool checkForNewPacket(bool logRFMessages);												//check RX fifo for new data
+		bool checkForNewPacket();												//check RX fifo for new data
 		bool checkForNewPacketInRXFifo();
 		uint8_t checkForBytesInRXFifo();
 
@@ -177,7 +184,11 @@ class DucoCC1101 : protected CC1101
 		DucoCC1101( const DucoCC1101 &c);
 		DucoCC1101& operator=( const DucoCC1101 &c);
 
+		void setLogMessage(const __FlashStringHelper* flashString);
 		void setLogMessage(const char *newLogMessage);
+
+
+		void sendDataToDuco(CC1101Packet *packet);
 
 
 
@@ -194,6 +205,7 @@ class DucoCC1101 : protected CC1101
 
 		uint8_t updateMessageCounter();
 		uint8_t getRssi();
+		int convertRssiHexToDBm();
 
 		//parse received message
 		void parseReceivedPackets();

@@ -11,6 +11,9 @@
 #include <SPI.h>
 // On Arduino, SPI pins are predefined
 
+#define CCPACKET_BUFFER_LEN        35 // packetlength + length byte + crc byte + lqi byte
+#define CCPACKET_DATA_LEN          CCPACKET_BUFFER_LEN - 3
+
 /*	Type of transfers */
 #define CC1101_WRITE_BURST						0x40
 #define CC1101_READ_SINGLE						0x80
@@ -25,7 +28,7 @@
 #define CC1101_TXFIFO							0x3F	// TX FIFO address
 #define CC1101_RXFIFO							0x3F	// RX FIFO address
 #define CC1101_PA_LowPower						0x60
-#define CC1101_PA_LongDistance					0xC0
+#define CC1101_PA_LongDistance				0xC0
 
 /*	Command strobes */
 #define CC1101_SRES								0x30	// Reset CC1101 chip
@@ -114,6 +117,7 @@
 
 /* Masks to retrieve status bit */
 #define CC1101_BITS_TX_FIFO_UNDERFLOW			0x80
+#define CC1101_BITS_RX_FIFO_OVERFLOW			0x80
 #define CC1101_BITS_RX_BYTES_IN_FIFO			0x7F
 #define CC1101_BITS_MARCSTATE					0x1F
 
@@ -196,6 +200,7 @@ class CC1101
 		// SPI helper functions
 		void select(void);
 		void deselect(void);
+		void flushRXAndSwitchToRX();
 		
 	protected:
 		uint8_t readRegister(uint8_t address);

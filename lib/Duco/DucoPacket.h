@@ -26,6 +26,21 @@ class DucoPacket
 		uint8_t dataLength;
 		
 		uint8_t counter;		//0-255, counter is increased on every remote button press
+
+		/**
+     	* CRC OK flag
+     	*/
+    	bool crc_ok;
+
+    	/**
+     	* Received Strength Signal Indication
+     	*/
+    	unsigned char rssi;
+
+    	/**
+     	* Link Quality Index
+     	*/
+    	unsigned char lqi;
 };
 
 

@@ -9,10 +9,12 @@
 #define PLUGIN_153
 #define PLUGIN_ID_153           153
 #define PLUGIN_NAME_153         "DUCO Serial GW - Box Sensor - CO2 (temp) & humidity sensor (temp & hum)"
-#define PLUGIN_READ_TIMEOUT_153   1200 // DUCOBOX askes "live" CO2 sensor info, so answer takes sometimes a second.
+#define PLUGIN_READ_TIMEOUT_153   1000 // DUCOBOX askes "live" CO2 sensor info, so answer takes sometimes a second.
 #define PLUGIN_LOG_PREFIX_153   String("[P153] DUCO BOX SENSOR: ")
 
 boolean Plugin_153_init = false;
+// when calling 'PLUGIN_READ', if serial port is in use set this flag and check in PLUGIN_ONCE_A_SECOND if serial port is free.
+bool P153_waitingForSerialPort = false;
 
 typedef enum {
     P153_DATA_BOX_TEMP = 0,
@@ -96,18 +98,87 @@ boolean Plugin_153(byte function, struct EventStruct *event, String& string)
 
 	case PLUGIN_READ:{
 		if (Plugin_153_init){
-      	addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_153 + "read box sensors");
-			readBoxSensors(PLUGIN_LOG_PREFIX_153, PCONFIG(P153_CONFIG_DEVICE), event->BaseVarIndex, PCONFIG(P153_CONFIG_LOG_SERIAL));
-      }
 
+			addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_153 + F("start read, eventid:") +event->TaskIndex);
+
+
+       // check if serial port is in use by another task, otherwise set flag.
+			if(serialPortInUseByTask == 255){
+				serialPortInUseByTask = event->TaskIndex;
+            addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_153 + F("Start readBoxSensors"));
+            startReadBoxSensors(PLUGIN_LOG_PREFIX_153);
+         }else{
+				addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_153 + F("Serial port in use, set flag to read data later."));
+				P153_waitingForSerialPort = true;
+			}
+		}
       success = true;
       break;
    }
+
+	
+	case PLUGIN_ONCE_A_SECOND:{
+		if(P153_waitingForSerialPort){
+			if(serialPortInUseByTask == 255){
+				Plugin_153(PLUGIN_READ, event, string);
+				P153_waitingForSerialPort = false;
+			}
+		}
+
+		if(serialPortInUseByTask == event->TaskIndex){
+			if( (millis() - ducoSerialStartReading) > PLUGIN_READ_TIMEOUT_153){
+				addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_153 + F("Serial reading timeout"));
+				DucoTaskStopSerial(PLUGIN_LOG_PREFIX_153);
+				serialPortInUseByTask = 255;
+			}
+		}
+		success = true;
+		break;
+	}
+
+
+
+
+	case PLUGIN_SERIAL_IN: {
+
+		// if we unexpectedly receive data we need to flush and return success=true so espeasy won't interpret it as an serial command.
+		if(serialPortInUseByTask == 255){
+			DucoSerialFlush();
+			success = true;
+		}
+
+		if(serialPortInUseByTask == event->TaskIndex){
+			uint8_t result = 0;
+			bool stop = false;
+			
+			while( (result = DucoSerialInterrupt()) != DUCO_MESSAGE_FIFO_EMPTY && stop == false){
+				switch(result){
+					case DUCO_MESSAGE_ROW_END: {
+                  readBoxSensorsProcessRow(PLUGIN_LOG_PREFIX_153, PCONFIG(P153_CONFIG_DEVICE), event->BaseVarIndex, PCONFIG(P153_CONFIG_LOG_SERIAL));
+						duco_serial_bytes_read = 0; // reset bytes read counter
+						break;
+					}
+					case DUCO_MESSAGE_END: {
+				      DucoThrowErrorMessage(PLUGIN_LOG_PREFIX_152, result);
+						DucoTaskStopSerial(PLUGIN_LOG_PREFIX_152);
+						stop = true;
+						break;
+					}
+				}
+			}
+			success = true;
+		}
+		break;
+	}
+
+
+
 
 
 
   }
   return success;
 }
+
 
 

@@ -9,10 +9,12 @@
 #define PLUGIN_152
 #define PLUGIN_ID_152           152
 #define PLUGIN_NAME_152         "DUCO Serial GW - Box Sensor - CO2"
-#define PLUGIN_READ_TIMEOUT_152   1200 // DUCOBOX askes "live" CO2 sensor info, so answer takes sometimes a second.
+#define PLUGIN_READ_TIMEOUT_152   1000 // DUCOBOX askes "live" CO2 sensor info, so answer takes sometimes a second.
 #define PLUGIN_LOG_PREFIX_152   String("[P152] DUCO BOX SENSOR: ")
 
 boolean Plugin_152_init = false;
+// when calling 'PLUGIN_READ', if serial port is in use set this flag and check in PLUGIN_ONCE_A_SECOND if serial port is free.
+bool P152_waitingForSerialPort = false;
 
 typedef enum {
    P152_CONFIG_LOG_SERIAL = 0,
@@ -83,13 +85,82 @@ boolean Plugin_152(byte function, struct EventStruct *event, String& string)
 
 	case PLUGIN_READ: {
    	if (Plugin_152_init){
-      	addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_152 + "read box sensors");
-         readBoxSensors(PLUGIN_LOG_PREFIX_152, P152_DUCO_DEVICE_CO2, event->BaseVarIndex, PCONFIG(P152_CONFIG_LOG_SERIAL));
+
+         addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_152 + F("start read, eventid:") +event->TaskIndex);
+
+
+         // check if serial port is in use by another task, otherwise set flag.
+			if(serialPortInUseByTask == 255){
+				serialPortInUseByTask = event->TaskIndex;
+            addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_152 + F("Start readBoxSensors"));
+            startReadBoxSensors(PLUGIN_LOG_PREFIX_152);
+         }else{
+				addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_152 + F("Serial port in use, set flag to read data later."));
+				P152_waitingForSerialPort = true;
+			}
+      
       }
 
       success = true;
       break;
    }
+
+	case PLUGIN_ONCE_A_SECOND:{
+		if(P152_waitingForSerialPort){
+			if(serialPortInUseByTask == 255){
+				Plugin_152(PLUGIN_READ, event, string);
+				P152_waitingForSerialPort = false;
+			}
+		}
+
+		if(serialPortInUseByTask == event->TaskIndex){
+			if( (millis() - ducoSerialStartReading) > PLUGIN_READ_TIMEOUT_152){
+				addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_152 + F("Serial reading timeout"));
+				DucoTaskStopSerial(PLUGIN_LOG_PREFIX_152);
+            serialPortInUseByTask = 255;
+			}
+		}
+
+		success = true;
+		break;
+	}
+
+
+	case PLUGIN_SERIAL_IN: {
+
+		// if we unexpectedly receive data we need to flush and return success=true so espeasy won't interpret it as an serial command.
+		if(serialPortInUseByTask == 255){
+			DucoSerialFlush();
+			success = true;
+		}
+
+		if(serialPortInUseByTask == event->TaskIndex){
+			uint8_t result =0;
+			bool stop = false;
+			
+			while( (result = DucoSerialInterrupt()) != DUCO_MESSAGE_FIFO_EMPTY && stop == false){
+
+				switch(result){
+					case DUCO_MESSAGE_ROW_END: {
+                  readBoxSensorsProcessRow(PLUGIN_LOG_PREFIX_152, P152_DUCO_DEVICE_CO2, event->BaseVarIndex, PCONFIG(P152_CONFIG_LOG_SERIAL));
+						duco_serial_bytes_read = 0; // reset bytes read counter
+                  break;
+					}
+					case DUCO_MESSAGE_END: {
+				      DucoThrowErrorMessage(PLUGIN_LOG_PREFIX_152, result);
+						DucoTaskStopSerial(PLUGIN_LOG_PREFIX_152);
+						stop = true;
+						break;
+					}
+				}
+			}
+			success = true;
+		}
+
+		break;
+	}
+
+
 
 
 
@@ -101,86 +172,81 @@ boolean Plugin_152(byte function, struct EventStruct *event, String& string)
 
 
 
-
-
-
-void readBoxSensors( String logPrefix, uint8_t sensorDeviceType, uint8_t userVarIndex, bool serialLoggingEnabled){
-   addLog(LOG_LEVEL_DEBUG, logPrefix + "Start readBoxSensors");
-    
-   /*
+// ventilation % and DUCO status
+void startReadBoxSensors(String logPrefix){
+ /*
     * Read box sensor information; this could contain CO2, Temperature and
     * Relative Humidity values, depending on the installed box sensors.
     */
+
+   // set this variables before sending command
+	ducoSerialStartReading = millis();
+	duco_serial_bytes_read = 0; // reset bytes read counter
+	duco_serial_rowCounter = 0; // reset row counter
+
    char command[] = "sensorinfo\r\n";
    int commandSendResult = DucoSerialSendCommand(logPrefix, command);
-   if (commandSendResult) {
-   	uint8_t result = 0; // stores the result of DucoSerialReceiveRow
-   	result = DucoSerialReceiveRow(logPrefix, PLUGIN_READ_TIMEOUT_152, serialLoggingEnabled);
+   if (!commandSendResult) {
+      addLog(LOG_LEVEL_ERROR, logPrefix + F("Failed to send commando to Ducobox"));
+      DucoTaskStopSerial(logPrefix);
+   }
+}
 
-		if (result != DUCO_MESSAGE_ROW_END){
-      	DucoThrowErrorMessage(logPrefix, result);
-      	return;
-      }else{
- 
-      	if (DucoSerialCheckCommandInResponse(logPrefix, "sensorinfo", false)) {
-         	addLog(LOG_LEVEL_DEBUG, logPrefix + "Received correct response on sensorinfo");
+
             /* Example output:
                 [SENSOR] INFO
                 CO2 :  627 [ppm] (0)
                 RH : 3246 [.01%] (0)
                 TEMP :  235 [.1°C] (0)
             */
-            
-				// receive next row while result is P151_MESSAGE_ROW_END
-            while ((result = DucoSerialReceiveRow(logPrefix, PLUGIN_READ_TIMEOUT_152, serialLoggingEnabled)) == DUCO_MESSAGE_ROW_END){
-					if(serialLoggingEnabled){
-               	DucoSerialLogArray(logPrefix,duco_serial_buf, duco_serial_bytes_read-1, 0);
-               }
-
-               duco_serial_buf[duco_serial_bytes_read] = '\0';
-               unsigned int raw_value;
-               char logBuf[30];
-
-
-					if(sensorDeviceType == P152_DUCO_DEVICE_CO2){
-               	if (sscanf((const char*)duco_serial_buf, "  CO2 : %u", &raw_value) == 1) {
-                  	unsigned int co2_ppm = raw_value; /* No conversion required */
-                     UserVar[userVarIndex] = co2_ppm;
-                     snprintf(logBuf, sizeof(logBuf), "CO2 PPM: %u = %u PPM", raw_value, co2_ppm);
-                     addLog(LOG_LEVEL_DEBUG, logPrefix + logBuf);
-                  }
-					}
-
-					if(sensorDeviceType == P152_DUCO_DEVICE_RH){
-	               if (sscanf((const char*)duco_serial_buf, "  RH : %u", &raw_value) == 1) {
-                     float rh = (float) raw_value / 100.;
-                     UserVar[userVarIndex + 1] = rh;
-                     snprintf(logBuf, sizeof(logBuf), "RH: %u = %.2f%%", raw_value, rh);
-                     addLog(LOG_LEVEL_DEBUG, logPrefix + logBuf);
-                  }
-					}
-
-					if(sensorDeviceType == P152_DUCO_DEVICE_CO2_TEMP || sensorDeviceType == P152_DUCO_DEVICE_RH){
-	               if (sscanf((const char*)duco_serial_buf, "  TEMP : %u", &raw_value) == 1) {
-                     float temp = (float) raw_value / 10.;
-                     UserVar[userVarIndex] = temp;
-
-                     snprintf(logBuf, sizeof(logBuf), "TEMP: %u = %.1f°C", raw_value, temp);
-                     addLog(LOG_LEVEL_DEBUG, logPrefix + logBuf);
-                  }
-					}
-
-            } // while
-
-            if (result != DUCO_MESSAGE_ROW_END){
-            	DucoThrowErrorMessage(logPrefix, result);
-            }
-
-               
-         } else { 
-            addLog(LOG_LEVEL_INFO, logPrefix + "Received invalid response on sensorinfo");
-         }
+void readBoxSensorsProcessRow( String logPrefix, uint8_t sensorDeviceType, uint8_t userVarIndex, bool serialLoggingEnabled){
+   
+      if(serialLoggingEnabled){	     
+         addLog(LOG_LEVEL_DEBUG, logPrefix + F("ROW:") + (duco_serial_rowCounter) + F(" bytes:") + duco_serial_bytes_read);
+         DucoSerialLogArray(logPrefix, duco_serial_buf, duco_serial_bytes_read, 0);
       }
+
+    // get the first row to check for command
+	if( duco_serial_rowCounter == 1){
+		if (DucoSerialCheckCommandInResponse(logPrefix, "sensorinfo") ) {
+     		addLog(LOG_LEVEL_DEBUG, logPrefix + F("Received correct response on sensorinfo"));
+      } else {
+         addLog(LOG_LEVEL_ERROR, logPrefix + F("Received invalid response"));
+			DucoTaskStopSerial(logPrefix);
+         return;
+      }
+	}else if( duco_serial_rowCounter > 2){
+      duco_serial_buf[duco_serial_bytes_read] = '\0';
+      unsigned int raw_value;
+      char logBuf[30];
+
+
+		if(sensorDeviceType == P152_DUCO_DEVICE_CO2){
+        	if (sscanf((const char*)duco_serial_buf, "  CO2 : %u", &raw_value) == 1) {
+            unsigned int co2_ppm = raw_value; /* No conversion required */
+            UserVar[userVarIndex] = co2_ppm;
+            snprintf(logBuf, sizeof(logBuf), "CO2 PPM: %u = %u PPM", raw_value, co2_ppm);
+            addLog(LOG_LEVEL_DEBUG, logPrefix + logBuf);
+            }
+      }
+
+		if(sensorDeviceType == P152_DUCO_DEVICE_RH){
+	      if (sscanf((const char*)duco_serial_buf, "  RH : %u", &raw_value) == 1) {
+            float rh = (float) raw_value / 100.;
+            UserVar[userVarIndex + 1] = rh;
+            snprintf(logBuf, sizeof(logBuf), "RH: %u = %.2f%%", raw_value, rh);
+            addLog(LOG_LEVEL_DEBUG, logPrefix + logBuf);
+         }
+		}
+
+		if(sensorDeviceType == P152_DUCO_DEVICE_CO2_TEMP || sensorDeviceType == P152_DUCO_DEVICE_RH){
+	      if (sscanf((const char*)duco_serial_buf, "  TEMP : %u", &raw_value) == 1) {
+            float temp = (float) raw_value / 10.;
+            UserVar[userVarIndex] = temp;
+            snprintf(logBuf, sizeof(logBuf), "TEMP: %u = %.1f°C", raw_value, temp);
+            addLog(LOG_LEVEL_DEBUG, logPrefix + logBuf);
+         }
+   	}
    }
    return;
 }

@@ -34,10 +34,15 @@ DucoCC1101::~DucoCC1101()
 {
 } //~DucoCC1101
 
+void DucoCC1101::setLogMessage(const __FlashStringHelper* flashString)
+{
+    String s(flashString);
+    setLogMessage(s.c_str());
+}
 
 void DucoCC1101::setLogMessage(const char *newLogMessage){
-	
-	strncpy(logMessages[this->numberOfLogmessages], newLogMessage, sizeof( (logMessages[this->numberOfLogmessages]) ) );
+	snprintf(logMessages[this->numberOfLogmessages], sizeof(logMessages[this->numberOfLogmessages]), "%lu - %s", millis(), newLogMessage);
+	//strncpy(logMessages[this->numberOfLogmessages], newLogMessage, sizeof( (logMessages[this->numberOfLogmessages]) ) );
 
 	if(this->numberOfLogmessages == 9){
 		this->numberOfLogmessages = 0;
@@ -55,6 +60,7 @@ uint8_t DucoCC1101::getNumberOfLogMessages(){
 
 void DucoCC1101::reset(){
 	writeCommand(CC1101_SRES);
+	this->ducoDeviceState = ducoDeviceState_notInitialised;
 
 	// TODO: reset/delete all variables
 	return;
@@ -83,14 +89,29 @@ void DucoCC1101::initReceive()
 
 	writeRegister(CC1101_IOCFG0 ,0x2E);	//!!! 	//High impedance (3-state)
 	writeRegister(CC1101_IOCFG1 ,0x2E);	//!!    //High impedance (3-state)
-	writeRegister(CC1101_IOCFG2 ,0x07);	//!!! duco 0x07 /  0x00		//Assert when RX FIFO is filled or above the RX FIFO threshold. Deassert when (0x00): RX FIFO is drained below threshold, or (0x01): deassert when RX FIFO is empty.
-	// ivm omruilen gpio's anders dan duco 
-	// gpio0 = niet gebruiken, gpio2 = bij geldig pakket
+	//writeRegister(CC1101_IOCFG2 ,0x07);	//!!! duco 0x07= Asserts when a packet has been received with CRC OK. De-asserts when the first byte is read from the RX FIFO.
+	
+	writeRegister(CC1101_IOCFG2 ,0x06);	
+	/* 6 (0x06) = Asserts when sync word has been sent / received, and de-asserts at the end of the packet. 
+	=> In RX, the pin will also deassert when a packet is discarded due to address or maximum length filtering 
+      or when the radio enters RXFIFO_OVERFLOW state. 
+			=>> on rising -> DO NOTHING
+			=>> on falling -> check 
+
+   => In TX the pin will de-assert if the TX FIFO underflows.
+	      =>> TODO: disable interrupt
+	*/
 
 	writeRegister(CC1101_FIFOTHR, 0x07); // default value. FIFO treshold TX=33;RX=32
 	writeRegister(CC1101_SYNC1 ,0xD3);	//duco 0xD3 /   		//message2 byte6
 	writeRegister(CC1101_SYNC0 ,0x91);	//duco 0x91	/  	//message2 byte7
-	writeRegister(CC1101_PKTLEN ,0x20); // duco 0x20 / 
+
+	writeRegister(CC1101_PKTLEN ,0x20); // duco 0x20 / maximum packet size is 32 bytes,
+	/* In variable packet length mode, PKTCTRL0.LENGTH_CONFIG=1, the packet length is configured by the first byte after the
+sync word. The packet length is defined as the payload data, excluding the length byte and the optional CRC. The PKTLEN register is
+used to set the maximum packet length allowed in RX. Any packet received with a length byte with a value greater than PKTLEN will be discarded.*/
+
+
 	writeRegister(CC1101_PKTCTRL1 ,0x0C); //duco 0x0C=00001100 /  	//ADR_CHK[1:0]=No address check, APPEND_STATUS= two status bytes will be appended to the payload of the packet. The status bytes contain RSSI and LQI values, as well as CRC OK.; CRC_AUTOFLUSH = Enable automatic flush of RX FIFO when CRC is not OK.
 	writeRegister(CC1101_PKTCTRL0 ,0x05); //duco 0x05=00000101 /  		//Variable packet length mode. Packet length configured by the first byte after sync word, CRC calculation in TX and CRC check in RX enabled, No data whitening, Normal mode, use FIFOs for RX and TX
 	
@@ -135,6 +156,8 @@ void DucoCC1101::initReceive()
 	writeRegister(CC1101_TEST2 ,0x81); // duco/
 	writeRegister(CC1101_TEST1 ,0x35); // duco/
 	writeRegister(CC1101_TEST0 ,0x09); // duco 0x09 / 0x0B
+
+	writeRegister(CC1101_IOCFG0 ,0x07);	//!!! 	//High impedance (3-state)
 
 	
 	//0x6F,0x26,0x2E,0x7F,0x8A,0x84,0xCA,0xC4
@@ -182,6 +205,19 @@ void DucoCC1101::initReceive()
 }
 
 
+void DucoCC1101::sendDataToDuco(CC1101Packet *packet){
+	// DEBUG
+	if(this->logRFMessages){
+		char bigLogBuf[250];
+		arrayToString(packet->data, min(static_cast<uint>(packet->length),sizeof(bigLogBuf)) , bigLogBuf);
+		setLogMessage(bigLogBuf);
+	}
+	// DEBUG
+	sendData(packet);
+}
+
+
+
 bool DucoCC1101::pollNewDeviceAddress(){
 	if(this->ducoDeviceState == ducoDeviceState_joinSuccessful) {
 		this->ducoDeviceState = ducoDeviceState_initialised;
@@ -224,20 +260,18 @@ void DucoCC1101::arrayToString(byte array[], unsigned int len, char buffer[])
 }
 
 
-bool DucoCC1101::checkForNewPacket(bool logRFMessages)
+bool DucoCC1101::checkForNewPacket()
 {
 	if (receiveData(&inMessage)){
-		inDucoPacket.messageType = inMessage.data[0];
-
+		//getMarcState();
 		if(inMessage.length < 8 ){
 			//discard package? length is smaller dan minimal packet length.... 
 			// resulting in negative uint8_t inDucoPacket.dataLength :S
-			setLogMessage("Invalid packed length (<8). Flushing RX buffer.");
-			writeCommand(CC1101_SIDLE);	//idle
-			writeCommand(CC1101_SFRX); //flush RX buffer
-			writeCommand(CC1101_SRX); //switch to RX state	
+			setLogMessage(F("Invalid packed length (<8)."));
 			return false;
 		}
+
+		inDucoPacket.messageType = inMessage.data[0];
 
 		// Fill Duco packet with data
 		memcpy(inDucoPacket.networkId, &inMessage.data[1], sizeof inDucoPacket.networkId);
@@ -247,39 +281,35 @@ bool DucoCC1101::checkForNewPacket(bool logRFMessages)
 		inDucoPacket.originalDestinationAddress = ( (inMessage.data[6] & 0b00000001) << 4) | (inMessage.data[7] >> 4); // get last 3 bits and shift left.
 		inDucoPacket.counter = (inMessage.data[7] & 0b00001111);
 
+		inDucoPacket.crc_ok = inMessage.crc_ok;
+		inDucoPacket.rssi = inMessage.rssi;
+		inDucoPacket.lqi = inMessage.lqi;
+
 		memcpy(&inDucoPacket.data, &inMessage.data[8],(inMessage.length-8));
 		inDucoPacket.dataLength = (inMessage.length-8);
 
 		// save RSSI value (we need this later for our reply on network messages )
-			lastRssiByte = inDucoPacket.data[inDucoPacket.dataLength-1];
+		//lastRssiByte = inDucoPacket.data[inDucoPacket.dataLength-1];
 
 		// CREATE LOG ENTRY OF RECEIVED PACKET
-		if(logRFMessages){
+		if(this->logRFMessages){
   			char bigLogBuf[250];
 		
-			snprintf(bigLogBuf, sizeof(bigLogBuf), "Received message: RSSI:%u; SRC:%u; DEST:%u; ORG.SRC:%u; ORG.DEST:%u; Ntwrk:%02x%02x%02x%02x; Type:%u; Bytes:%u; Cntr:%u;",
-				  	lastRssiByte,inDucoPacket.sourceAddress,inDucoPacket.destinationAddress, inDucoPacket.originalSourceAddress, inDucoPacket.originalDestinationAddress,inDucoPacket.networkId[0], inDucoPacket.networkId[1], inDucoPacket.networkId[2], inDucoPacket.networkId[3], 	
-					inDucoPacket.messageType, inMessage.length, inDucoPacket.counter);
+			snprintf(bigLogBuf, sizeof(bigLogBuf), "Received message: SRC:%u; DEST:%u; ORG.SRC:%u; ORG.DEST:%u; Ntwrk:%02x%02x%02x%02x;",
+				  inDucoPacket.sourceAddress,inDucoPacket.destinationAddress, inDucoPacket.originalSourceAddress, inDucoPacket.originalDestinationAddress,inDucoPacket.networkId[0], inDucoPacket.networkId[1], inDucoPacket.networkId[2], inDucoPacket.networkId[3]);
+			setLogMessage(bigLogBuf);
+			memset(bigLogBuf, 0, sizeof(bigLogBuf)); // reset char bigLogBuf
 
+			snprintf(bigLogBuf, sizeof(bigLogBuf), "Type:%u; Bytes:%u; Counter:%u; RSSI:%d (0x%02X); ",
+				  	inDucoPacket.messageType, inMessage.length, inDucoPacket.counter,	 convertRssiHexToDBm(), inDucoPacket.rssi);
 			setLogMessage(bigLogBuf);
 
 			memset(bigLogBuf, 0, sizeof(bigLogBuf)); // reset char bigLogBuf
+
 			//log received bytes 
 			arrayToString(inDucoPacket.data, min(static_cast<uint>(inDucoPacket.dataLength),sizeof(bigLogBuf)) , bigLogBuf);
 			setLogMessage(bigLogBuf);
 		}
-
-		/*
-		if(logRFMessages){
-			if(inDucoPacket.sourceAddress != inDucoPacket.originalSourceAddress){
-				setLogMessage("Sender and sender2 not matching!");
-			}
-
-			if(inDucoPacket.destinationAddress != inDucoPacket.originalDestinationAddress){
-				setLogMessage("Receiver and receiver2 not matching!");
-			}
-		}
-*/
 
 		// check if network ID is our network ID
 		/*YES: 
@@ -294,8 +324,8 @@ bool DucoCC1101::checkForNewPacket(bool logRFMessages)
 		if(matchingNetworkId(inDucoPacket.networkId)){ // check for network id
 				
 			// if destinationAddress is broadcastaddress = 0, then repeat the message
-			if(inDucoPacket.destinationAddress == 0x00 && inDucoPacket.messageType == ducomsg_network){
-				setLogMessage("Received messagetype: network0");
+			if(inDucoPacket.destinationAddress == 0x00 && inDucoPacket.sourceAddress == 0x01 && inDucoPacket.messageType == ducomsg_network){
+				setLogMessage(F("Received messagetype: network0"));
 				processNetworkPacket();
 
 			// check if the message is send to this device
@@ -308,38 +338,38 @@ bool DucoCC1101::checkForNewPacket(bool logRFMessages)
 					switch(inDucoPacket.messageType){
 						case ducomsg_network:{
 							// if we receive a network message send to a specific node we most send an Ack!
-							setLogMessage("Received messagetype: network0 (addressed to this node!)");
+							setLogMessage(F("Received messagetype: network0 (addressed to this node!)"));
 							sendAck(); 
 							processNetworkPacket(); // also resend network package if it is addressed to this node?
 							break;
 						}
 						case ducomsg_ack:{
-							setLogMessage("Received messagetype: ACK");
+							setLogMessage(F("Received messagetype: ACK"));
 							
 							// stop retry sending message
 							if(outDucoPacket.counter == inDucoPacket.counter){
 								waitingForAck = 0;
-								setLogMessage("Ack received!");
+								setLogMessage(F("Ack received!"));
 
 								// if we've send a disjoin message and receive an ACK, set ducoDeviceState to the next status
 								if(ducoDeviceState == ducoDeviceState_disjoinWaitingForAck){
 									ducoDeviceState = ducoDeviceState_disjoinWaitingForConfirmation;
 								}
 							}else{
-									setLogMessage("Ack received but counter doesnt match!");
+									setLogMessage(F("Ack received but counter doesnt match!"));
 							}					
 							break;
 						}
 
 						case ducomsg_message:{
-							setLogMessage("Received messagetype: Normal message");
+							setLogMessage(F("Received messagetype: Normal message"));
 							sendAck(); 
 							parseMessageCommand();	
 							break;
 						}
 
 						case ducomsg_join4:{
-							setLogMessage("Received messagetype: JOIN4");
+							setLogMessage(F("Received messagetype: JOIN4"));
 							// if we are waiting for disjoin confirmation, finish disjoin
 							if(ducoDeviceState == ducoDeviceState_disjoinWaitingForConfirmation){
 								finishDisjoin();
@@ -349,21 +379,21 @@ bool DucoCC1101::checkForNewPacket(bool logRFMessages)
 								sendJoinFinish();	
 							}else{
 								// if ducobox didnt receive the first ack (from sendJoinFinish()), check if address in packet is the same and send ack again!
-								setLogMessage("Received join4 message but join already finished, check address and resend ACK.");
+								setLogMessage(F("Received join4 message but join already finished, check address and resend ACK."));
 								if(inDucoPacket.data[5] == this->deviceAddress){
 									sendAck();
-									setLogMessage("SendJoinFinish: another ACK sent!");
+									setLogMessage(F("SendJoinFinish: another ACK sent!"));
 								}else{
-									setLogMessage("No match between join4 address and our deviceid. ingoring message...");
+									setLogMessage(F("No match between join4 address and our deviceid. ingoring message..."));
 								}
-								setLogMessage("Ignore JOIN4. No join or disjoin action running...");
+								setLogMessage(F("Ignore JOIN4. No join or disjoin action running..."));
 							}
 							break;
 						}
 
 
 						default:{
-							setLogMessage("Received messagetype: unknown");
+							setLogMessage(F("Received messagetype: unknown"));
 							break;
 						}
 					} // end switch
@@ -381,17 +411,17 @@ bool DucoCC1101::checkForNewPacket(bool logRFMessages)
 			// network ID doesnt match with our network ID => are we joining a network?
 			switch(inDucoPacket.messageType){
 				case ducomsg_join2:{
-					setLogMessage("Received messagetype: JOIN2");
+					setLogMessage(F("Received messagetype: JOIN2"));
 					if(ducoDeviceState == ducoDeviceState_join1){
 						sendJoin3Packet();
 					}else{
-						setLogMessage("Ignoring because GW status is not JOIN1");
+						setLogMessage(F("Ignoring because GW status is not JOIN1"));
 					}
 					break;
 				}
 
 				default:{
-					setLogMessage("Ignore message, not our networkID.");
+					setLogMessage(F("Ignore message, not our networkID."));
 					break;
 				}
 			}//switch
@@ -416,16 +446,25 @@ uint8_t DucoCC1101::updateMessageCounter(){
 
 
 uint8_t DucoCC1101::getRssi(){
-	if (lastRssiByte >= 128){
+	if (inDucoPacket.rssi >= 128){
         //rssi_dec = ( rssi_byte - 256) / 2) - 74;
-		return (lastRssiByte - 128);
+		return (inDucoPacket.rssi - 128);
 	}else{
         //rssi_dec = (rssi_byte / 2) - 74;
-		return (lastRssiByte + 128);
+		return (inDucoPacket.rssi + 128);
 	}
-
 }
 
+int DucoCC1101::convertRssiHexToDBm(){
+	int rssi_dec = 0;
+	if (inDucoPacket.rssi >= 128){
+      rssi_dec = (( inDucoPacket.rssi - 256) / 2) - 74;
+	}else{
+      rssi_dec = (inDucoPacket.rssi / 2) - 74;
+	}
+	return rssi_dec;
+
+}
 
 void DucoCC1101::processNetworkPacket(){
 	/* first data byte of a network package:
@@ -440,16 +479,15 @@ void DucoCC1101::processNetworkPacket(){
 			break;
 		case 0x01:
 			installerModeActive = true;
-			setLogMessage("Installermode activated!");
+			setLogMessage(F("Installermode activated!"));
 		break;
 		default:
-			setLogMessage("Unknown databyte in network packet");
+			/* 
+			If databyte is higer than 1, it is a broadcast for a specific the node number!
+			*/
+			setLogMessage(F("Network message -> call to specific node"));
 		break;
 	}
-
-	/* 
-		TODO, if databyte is higer than 1, it can be a broadcast for a specific the node number!
-	*/
 
 
 	// after receiving a networkpacket, each node repeats the network packet with RSSI value
@@ -469,15 +507,15 @@ void DucoCC1101::processNetworkPacket(){
 	// packet 9 = footer, needs to be rssi value.
 	outMessage.data[9] = ducoRssi;
 
-	sendData(&outMessage);
-	setLogMessage("Send processNetworkPacket done!");
+	sendDataToDuco(&outMessage);
+	setLogMessage(F("Send processNetworkPacket done!"));
 }
 
 
 
 
 void DucoCC1101::sendDisjoinPacket(){
-	setLogMessage("sendDisjoinPacket()");
+	setLogMessage(F("sendDisjoinPacket()"));
 
 	ducoDeviceState = ducoDeviceState_disjoinRequest;
 	outDucoPacket.messageType = ducomsg_message;
@@ -493,17 +531,17 @@ void DucoCC1101::sendDisjoinPacket(){
 	outDucoPacket.counter = updateMessageCounter();
 	ducoToCC1101Packet(&outDucoPacket, &outMessage);
 
-	sendData(&outMessage);
-	setLogMessage("SEND disjoin packet done!");
+	sendDataToDuco(&outMessage);
+	setLogMessage(F("SEND disjoin packet done!"));
 	ducoDeviceState = ducoDeviceState_disjoinWaitingForAck;
 }
 
 void DucoCC1101::finishDisjoin(){
-	setLogMessage("FinishDisjoin()");
+	setLogMessage(F("FinishDisjoin()"));
 	if(matchingNetworkId(inDucoPacket.networkId)){
 		if(matchingDeviceAddress(inDucoPacket.destinationAddress)){
 			sendAck(); 						// then send ack
-			setLogMessage("Device disjoining finished!");
+			setLogMessage(F("Device disjoining finished!"));
 			// remove networkID and deviceID
 			this->networkId[0] = 0x00;
 			this->networkId[1] = 0x00;
@@ -518,7 +556,7 @@ void DucoCC1101::finishDisjoin(){
 }
 
 void DucoCC1101::sendJoinPacket(){
-	setLogMessage("SendJoinPacket()");
+	setLogMessage(F("SendJoinPacket()"));
 
 	outDucoPacket.messageType = ducomsg_join1;	
 	outDucoPacket.sourceAddress =  0x01;
@@ -537,14 +575,14 @@ void DucoCC1101::sendJoinPacket(){
 
 	ducoToCC1101Packet(&outDucoPacket, &outMessage);
 
-	sendData(&outMessage);
+	sendDataToDuco(&outMessage);
 	//finishTransfer();
-	setLogMessage("Joinpacket sent");
+	setLogMessage(F("Joinpacket sent"));
 	ducoDeviceState = ducoDeviceState_join1;
 }
 
 void DucoCC1101::sendJoin3Packet(){
-	setLogMessage("sendJoin3Packet()");
+	setLogMessage(F("sendJoin3Packet()"));
 
 	bool validJoin2Packet = false;
 
@@ -564,7 +602,7 @@ void DucoCC1101::sendJoin3Packet(){
 	}
 
 	if(validJoin2Packet){
-		setLogMessage("SendJoin3Packet: valid join2 packet received!");
+		setLogMessage(F("SendJoin3Packet: valid join2 packet received!"));
 
 		outDucoPacket.sourceAddress =  0x00;
 		outDucoPacket.destinationAddress = 0x01;
@@ -590,17 +628,17 @@ void DucoCC1101::sendJoin3Packet(){
 		outDucoPacket.counter = 0x0D; // counter is always 13 for join3 message! (for battery remote!!!)
 		ducoToCC1101Packet(&outDucoPacket, &outMessage);
 
-		sendData(&outMessage);
-		setLogMessage("sendJoinFinish: join3 message sent!");
+		sendDataToDuco(&outMessage);
+		setLogMessage(F("sendJoinFinish: join3 message sent!"));
 		ducoDeviceState = ducoDeviceState_join3;
 
 	}else{
-		setLogMessage("SendJoin3Packet: INVALID join2 packet received!");
+		setLogMessage(F("SendJoin3Packet: INVALID join2 packet received!"));
 	}
 }
 
 void DucoCC1101::sendJoinFinish(){
-	setLogMessage("sendJoinFinish()");
+	setLogMessage(F("sendJoinFinish()"));
 	bool validJoin4Packet = false;
 
 	if(matchingNetworkId(inDucoPacket.networkId)){
@@ -621,7 +659,7 @@ void DucoCC1101::sendJoinFinish(){
 	}
 
 	if(validJoin4Packet){
-		setLogMessage("sendJoinFinish: valid join4 packet received!");
+		setLogMessage(F("sendJoinFinish: valid join4 packet received!"));
 		if(inDucoPacket.data[5] == inDucoPacket.data[6]){
 			this->deviceAddress = inDucoPacket.data[5]; // = new address	
 
@@ -631,11 +669,11 @@ void DucoCC1101::sendJoinFinish(){
 
 			// send ack! from new deviceaddress to address of sender.
 			sendAck();
-			setLogMessage("sendJoinFinish: ACK sent!");
+			setLogMessage(F("sendJoinFinish: ACK sent!"));
 			ducoDeviceState = ducoDeviceState_joinSuccessful;
 		}
 	}else{
-		setLogMessage("sendJoinFinish: INVALID join4 packet received!");
+		setLogMessage(F("sendJoinFinish: INVALID join4 packet received!"));
 	}
 }
 
@@ -643,7 +681,7 @@ void DucoCC1101::sendJoinFinish(){
 
 
 void DucoCC1101::waitForAck(){
-	setLogMessage("Start waiting for ack...");
+	setLogMessage(F("Start waiting for ack..."));
 	this->ackTimer = millis();
 	this->ackRetry = 0;
 	this->waitingForAck = 1;
@@ -656,16 +694,16 @@ void DucoCC1101::checkForAck(){
 		unsigned long mill = millis();
  		if (mill - this->ackTimer >= 500){ // wait for 300 ms (standard duco),
 		 	if(this->ackRetry <= this->sendTries){
-				setLogMessage("CheckforAck: still waiting for ACK");
+				setLogMessage(F("CheckforAck: still waiting for ACK. Sending message again..."));
 				//resend message
-				sendData(&outMessage);
-				setLogMessage("CheckforAck: message resent");
+				sendDataToDuco(&outMessage);
+				//setLogMessage("CheckforAck: message resent");
 
 				this->ackTimer = millis();
 				this->ackRetry++;
 			 }else{
 				 this->waitingForAck = 0;
-				setLogMessage("CheckforAck: no ack received, cancel retrying.");
+				setLogMessage(F("CheckforAck: no ack received, cancel retrying."));
 
 			 }
 		 }
@@ -696,6 +734,11 @@ bool DucoCC1101::matchingDeviceAddress(uint8_t compDeviceAddress){
 
 bool DucoCC1101::checkForNewPacketInRXFifo(){
 	uint8_t rxBytes = readRegisterWithSyncProblem(CC1101_RXBYTES, CC1101_STATUS_REGISTER);
+	
+	char LogBuf[20];
+	snprintf(LogBuf, sizeof(LogBuf), "STATUS: %02X",rxBytes);
+	setLogMessage(LogBuf);
+
 	rxBytes = rxBytes & CC1101_BITS_RX_BYTES_IN_FIFO;
 
 	if(rxBytes > 0){
@@ -704,6 +747,20 @@ bool DucoCC1101::checkForNewPacketInRXFifo(){
 		return false;
 	}
 }
+
+
+uint8_t DucoCC1101::getMarcState(bool noLogMessage){
+	uint8_t result = readRegisterWithSyncProblem(CC1101_MARCSTATE, CC1101_STATUS_REGISTER);
+
+if(!noLogMessage){
+	char LogBuf[20];
+	snprintf(LogBuf, sizeof(LogBuf), "MARCST: %02X",result);
+	setLogMessage(LogBuf);
+}
+return result;
+}
+
+
 
 uint8_t DucoCC1101::checkForBytesInRXFifo(){
 	uint8_t rxBytes = readRegisterWithSyncProblem(CC1101_RXBYTES, CC1101_STATUS_REGISTER);
@@ -724,7 +781,7 @@ void DucoCC1101::parseMessageCommand()
 		//0x10 0x00 
 		case 0x10:
 			if(inDucoPacket.data[2] == 0x00){
-				setLogMessage("Received ping command");
+				setLogMessage(F("Received ping command"));
 				if(inDucoPacket.data[3] == 0x38){
 					// do nothing
 				}else{
@@ -738,7 +795,7 @@ void DucoCC1101::parseMessageCommand()
 		// 0x20 0x00 0x12
 		case 0x20:
 		if( (inDucoPacket.data[2] == 0x00) && (inDucoPacket.data[3] == 0x12)){
-			setLogMessage("Received change ventilation command");
+			setLogMessage(F("Received change ventilation command"));
 
 			if((inDucoPacket.data[4] < 7)){ //CHECK IF ventilationmode has a valid value
 				currentVentilationMode = inDucoPacket.data[4];
@@ -756,7 +813,7 @@ void DucoCC1101::parseMessageCommand()
 		//0x30 0x00 0x40 0x00
 		case 0x30:
 			if((inDucoPacket.data[2] == 0x00) && (inDucoPacket.data[3] == 0x40) && (inDucoPacket.data[4] == 0x00)){
-					setLogMessage("Received request for parameter value command");
+					setLogMessage(F("Received request for parameter value command"));
 					sendNodeParameterValue();
 					waitForAck();
 			}
@@ -766,13 +823,13 @@ void DucoCC1101::parseMessageCommand()
 		//0x33 0x33 for 4 parameters OR 0x33 0x00 for 2 parameters
 		case 0x33:
 			if( (inDucoPacket.data[2] == 0x33) || (inDucoPacket.data[2] == 0x00)){
-				setLogMessage("Received request for multiple parameters value command");
+				setLogMessage(F("Received request for multiple parameters value command"));
 				sendMultipleNodeParameterValue();
 				waitForAck();
 			}
 		break;
 		case DEFAULT:{
-			setLogMessage("Unknown command received");
+			setLogMessage(F("Unknown command received"));
 			break;
 		}
 	}
@@ -802,8 +859,8 @@ void DucoCC1101::repeatMessage(){
 	ducoRssi = getRssi();
 	outMessage.data[9] = ducoRssi;
 
-	sendData(&outMessage);
-	setLogMessage("SEND repeatMessage() done!");
+	sendDataToDuco(&outMessage);
+	setLogMessage(F("SEND repeatMessage() done!"));
 }
 
 
@@ -831,8 +888,8 @@ void DucoCC1101::sendConfirmationNewVentilationMode(){
 	outDucoPacket.counter = updateMessageCounter();
 	ducoToCC1101Packet(&outDucoPacket, &outMessage);
 
-	sendData(&outMessage);
-	setLogMessage("SEND sendConfirmationNewVentilationMode done!");
+	sendDataToDuco(&outMessage);
+	setLogMessage(F("SEND sendConfirmationNewVentilationMode done!"));
 }
 
 
@@ -907,7 +964,7 @@ void DucoCC1101::sendNodeParameterValue(){
 		}
 		default:{
 		//parameter does not exist response: 0x40	0x00	0x42	0x00 + parameterbyte + 0x02
-			setLogMessage("sendNodeParameterValue(); Requested parameter does not exist!");
+			setLogMessage(F("sendNodeParameterValue(); Requested parameter does not exist!"));
 
 			outDucoPacket.command[0] = 0x40;
 			outDucoPacket.command[1] = 0x00;
@@ -929,7 +986,7 @@ void DucoCC1101::sendNodeParameterValue(){
 	outDucoPacket.counter = updateMessageCounter();
 	ducoToCC1101Packet(&outDucoPacket, &outMessage);
 
-	sendData(&outMessage);
+	sendDataToDuco(&outMessage);
 
 	char logBuf[30];
 	snprintf(logBuf, sizeof(logBuf), "SEND parameter %u done", parameter);
@@ -940,7 +997,7 @@ void DucoCC1101::sendNodeParameterValue(){
 
 
 void DucoCC1101::sendMultipleNodeParameterValue(){
-	setLogMessage("sendMultipleNodeParameterValue()");
+	//setLogMessage("sendMultipleNodeParameterValue()");
 
 	//commando opvragen apparaatinfo (meerdere adresen per uitleesactie)					33	33	40	registeraddress byte1	registeraddress byte2	40	registeraddress byte1	registeraddress byte2	40	registeraddress byte1	registeraddress byte2	40	registeraddress byte1	registeraddress byte2								
 	//antwoord					55	55	41	registeraddress byte1	registeraddress byte2	waarde byte 1	waarde byte 2	41	registeraddress byte1	registeraddress byte2	waarde byte 1	waarde byte 2	41	registeraddress byte1	registeraddress byte2	waarde byte 1	waarde byte 2	41	0	3	0	0
@@ -982,8 +1039,8 @@ void DucoCC1101::sendMultipleNodeParameterValue(){
 	outDucoPacket.counter = updateMessageCounter();
 	ducoToCC1101Packet(&outDucoPacket, &outMessage);
 
-	sendData(&outMessage);
-	setLogMessage("Send multiple parameter done!");
+	sendDataToDuco(&outMessage);
+	setLogMessage(F("Send multiple parameter done!"));
 }
 
 
@@ -1026,15 +1083,15 @@ void DucoCC1101::sendPing(){
 	outDucoPacket.counter = inDucoPacket.counter;
 	ducoToCC1101Packet(&outDucoPacket, &outMessage);
 
-	sendData(&outMessage);
-	setLogMessage("SEND PING done!");
+	sendDataToDuco(&outMessage);
+	setLogMessage(F("SEND PING done!"));
 }
 
 
 
 
 void DucoCC1101::sendAck(){
-	setLogMessage("Send Ack...");
+	//setLogMessage("Send Ack...");
 
 	outDucoPacket.messageType = ducomsg_ack;
 	outDucoPacket.commandLength = 0;
@@ -1045,8 +1102,8 @@ void DucoCC1101::sendAck(){
 	outDucoPacket.counter = inDucoPacket.counter;
 	ducoToCC1101Packet(&outDucoPacket, &outMessage);
 
-	sendData(&outMessage);
-	setLogMessage("SEND ACK done!");
+	sendDataToDuco(&outMessage);
+	setLogMessage(F("SEND ACK done!"));
 }
 
 void DucoCC1101::prefillDucoPacket(DucoPacket *ducoOutPacket, uint8_t destinationAddress){
@@ -1090,11 +1147,6 @@ void DucoCC1101::ducoToCC1101Packet(DucoPacket *duco, CC1101Packet *packet)
 
 	packet->length = 10 + duco->commandLength + duco->dataLength;
 
-		// DEBUG
-	char bigLogBuf[300];
-	arrayToString(packet->data, min(static_cast<uint>(packet->length),sizeof(bigLogBuf)) , bigLogBuf);
-	setLogMessage(bigLogBuf);
-	// DEBUG
 
 
 
@@ -1107,7 +1159,7 @@ void DucoCC1101::requestVentilationMode(uint8_t ventilationMode, uint8_t percent
 }
 
 void DucoCC1101::requestVentilationMode(uint8_t ventilationMode, uint8_t percentage, uint8_t temp, bool activateInstallerMode){
-	setLogMessage("requestVentilationMode()");
+	//setLogMessage("requestVentilationMode()");
 
 	uint8_t installerModeBit = activateInstallerMode ? 0x10 : 0x00; // 0x10 = 0001.0000
 
@@ -1125,14 +1177,10 @@ void DucoCC1101::requestVentilationMode(uint8_t ventilationMode, uint8_t percent
  //prefillDucoPacket(DucoPacket *ducoOutPacket, uint8_t destinationAddress, uint8_t originalSourceAddress, uint8_t originalDestinationAddress 
 	prefillDucoPacket(&outDucoPacket, 0x01); // address duco
 
-	// increase counter!
-	// function like getCounter()???
-	outDucoPacket.counter = inDucoPacket.counter;
-
+	outDucoPacket.counter = updateMessageCounter();
 	ducoToCC1101Packet(&outDucoPacket, &outMessage);
 
-	sendData(&outMessage);
-	setLogMessage("SEND requestventilationmode done!");
+	sendDataToDuco(&outMessage);
 
 	char logBuf[120];
 	snprintf(logBuf, sizeof(logBuf), "Send requestventilationmode done. mode: %u, override percentage: %u%%, temp: %u C, installermode: %u", ventilationMode, percentage, temp, activateInstallerMode);
@@ -1142,7 +1190,7 @@ void DucoCC1101::requestVentilationMode(uint8_t ventilationMode, uint8_t percent
 
 	// change current ventilation mode => DONT, just wait for confirmation message!
 	//currentVentilationMode = ventilationMode; 
-
+return;
 }
 
 
@@ -1150,7 +1198,7 @@ void DucoCC1101::requestVentilationMode(uint8_t ventilationMode, uint8_t percent
 
 
 void DucoCC1101::disableInstallerMode(){
-	setLogMessage("disableInstallerMode()");
+	//setLogMessage("disableInstallerMode()");
 	outDucoPacket.messageType = ducomsg_network;
 
 	outDucoPacket.commandLength = 0;
@@ -1161,11 +1209,11 @@ void DucoCC1101::disableInstallerMode(){
 
 	// increase counter!
 	// function like getCounter()???
-	outDucoPacket.counter = inDucoPacket.counter;
+	outDucoPacket.counter = updateMessageCounter();
 	ducoToCC1101Packet(&outDucoPacket, &outMessage);
 
-	sendData(&outMessage);
-	setLogMessage("SEND disableInstallerMode done!");
+	sendDataToDuco(&outMessage);
+	setLogMessage(F("SEND disableInstallerMode done!"));
 
 	waitForAck();
 

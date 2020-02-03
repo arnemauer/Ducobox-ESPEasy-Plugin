@@ -181,39 +181,52 @@ void CC1101::readBurstRegister(uint8_t* buffer, uint8_t address, uint8_t length)
 
 
 
-//wait for fixed length in rx fifo
-uint8_t CC1101::receiveData(CC1101Packet* packet)
-{
+	/* 6 (0x06) = Asserts when sync word has been sent / received, and de-asserts at the end of the packet. 
+		// automatic CRC 
+	=> In RX, the pin will also deassert when a packet is discarded due to address or maximum length filtering 
+	*/
+uint8_t CC1101::receiveData(CC1101Packet* packet){
+	uint8_t val;
+	uint8_t rxBytes = readRegisterWithSyncProblem(CC1101_RXBYTES, CC1101_STATUS_REGISTER);
 
-uint8_t i;
-uint8_t packet_length[1];
-
-// do we need to read out the bytes in fifo or only read the bytes in packet length (first byte)
-//uint8_t rxBytes = readRegisterWithSyncProblem(CC1101_RXBYTES, CC1101_STATUS_REGISTER);
-//	rxBytes = rxBytes & CC1101_BITS_RX_BYTES_IN_FIFO;
+	// Any byte waiting to be read and no overflow?
+	if ( (rxBytes & CC1101_BITS_RX_BYTES_IN_FIFO) && !(rxBytes & 0x80)){
 	
-	//check for rx fifo overflow
-	if ((readRegisterWithSyncProblem(CC1101_MARCSTATE, CC1101_STATUS_REGISTER) & CC1101_BITS_MARCSTATE) == CC1101_MARCSTATE_RXFIFO_OVERFLOW)
-	{
-		writeCommand(CC1101_SIDLE);	//idle
-		writeCommand(CC1101_SFRX); //flush RX buffer
-		writeCommand(CC1101_SRX); //switch to RX state	
-		packet->length = 0;		
+		// get first byte of packet => contains total bytes of message (excl. crc)
+		//readBurstRegister(packet_length, CC1101_RXFIFO, 1);
+		packet->length = readRegister(CC1101_RXFIFO | CC1101_READ_SINGLE);
 
+		// If packet is too long
+    	if (packet->length > CCPACKET_DATA_LEN){
+			flushRXAndSwitchToRX();
+      	packet->length = 0;   // Discard packet
+	 	} else {
+			// Read data packet
+			readBurstRegister(packet->data, CC1101_RXFIFO, packet->length);
+			// Read RSSI
+			packet->rssi = readRegister(CC1101_RXFIFO | CC1101_READ_SINGLE);
+			// Read LQI and CRC_OK
+			val = readRegister(CC1101_RXFIFO | CC1101_READ_SINGLE);
+			packet->lqi = val & 0x7F;
+			packet->crc_ok = bitRead(val, 7);
+		}
+	
 	}else{
-
-			// get first byte of packet => contains total bytes of message (excl. crc)
-			readBurstRegister(packet_length, CC1101_RXFIFO, 1);
-
-			// GET bytes of RX FIFO
-			packet_length[0] = packet_length[0] + 2; // add two crc bytes
-			readBurstRegister(&packet->data[0], CC1101_RXFIFO, packet_length[0]);
-
-			packet->length = packet_length[0];		
+		flushRXAndSwitchToRX();
+		packet->length = 0;		
 	}
 
 	return packet->length;
 }
+
+void CC1101::flushRXAndSwitchToRX(){
+	uint8_t uselessVariable = readRegister(CC1101_RXFIFO | CC1101_READ_SINGLE);
+	writeCommand(CC1101_SIDLE);	//idle
+	writeCommand(CC1101_SFRX); //flush RX buffer
+	writeCommand(CC1101_SRX); //switch to RX state	
+	return;
+}
+
 
 //This function is able to send packets bigger then the FIFO size.
 void CC1101::sendData(CC1101Packet *packet)
@@ -239,18 +252,6 @@ void CC1101::sendData(CC1101Packet *packet)
 	//determine how many bytes to send
 	length = (packet->length <= CC1101_DATA_LEN ? packet->length : CC1101_DATA_LEN);
 	packet->data[0] = (packet->length -1 );
-
-	// Debug 
-	/*
-	Serial.print("DUCO: sending message: ");
-	for(int i=0;i<= (packet->length-1);i++){
-		Serial.print(packet->data[i], HEX);
-		Serial.print(", ");
-	}	
-		//Serial.print(packet->data[i], HEX);
-	Serial.println(" - end");
-	// Debug 
-*/
 
 	writeBurstRegister(CC1101_TXFIFO, packet->data, length);
 

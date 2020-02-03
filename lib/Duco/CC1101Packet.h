@@ -20,6 +20,20 @@ class CC1101Packet
 	public:
 		uint8_t length;
 		uint8_t data[72];
+				/**
+     	* CRC OK flag
+     	*/
+    	bool crc_ok;
+
+    	/**
+     	* Received Strength Signal Indication
+     	*/
+    	unsigned char rssi;
+
+    	/**
+     	* Link Quality Index
+     	*/
+    	unsigned char lqi;
 };
 
 
