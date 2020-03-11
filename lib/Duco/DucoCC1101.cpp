@@ -199,9 +199,9 @@ used to set the maximum packet length allowed in RX. Any packet received with a 
 		return;
 	}	
 
-	if(this->deviceAddress != 0x00){
+	//if(this->deviceAddress != 0x00){ remove this, when we want to join a network we have our address is 0.
 		this->ducoDeviceState = ducoDeviceState_initialised;
-	}
+	//}
 }
 
 
