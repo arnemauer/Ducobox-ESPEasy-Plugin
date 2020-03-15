@@ -90,14 +90,16 @@ boolean Plugin_153(byte function, struct EventStruct *event, String& string)
 	}
       
 	case PLUGIN_INIT:{
-      Serial.begin(115200, SERIAL_8N1);
-      Plugin_153_init = true;
+		if(!ventilation_gateway_disable_serial){
+			Serial.begin(115200, SERIAL_8N1);
+			Plugin_153_init = true;
+		}
       success = true;
       break;
    }
 
 	case PLUGIN_READ:{
-		if (Plugin_153_init){
+		if (Plugin_153_init && !ventilation_gateway_disable_serial){
 
 			addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_153 + F("start read, eventid:") +event->TaskIndex);
 
@@ -118,18 +120,20 @@ boolean Plugin_153(byte function, struct EventStruct *event, String& string)
 
 	
 	case PLUGIN_ONCE_A_SECOND:{
-		if(P153_waitingForSerialPort){
-			if(serialPortInUseByTask == 255){
-				Plugin_153(PLUGIN_READ, event, string);
-				P153_waitingForSerialPort = false;
+		if(!ventilation_gateway_disable_serial){
+			if(P153_waitingForSerialPort){
+				if(serialPortInUseByTask == 255){
+					Plugin_153(PLUGIN_READ, event, string);
+					P153_waitingForSerialPort = false;
+				}
 			}
-		}
 
-		if(serialPortInUseByTask == event->TaskIndex){
-			if( (millis() - ducoSerialStartReading) > PLUGIN_READ_TIMEOUT_153){
-				addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_153 + F("Serial reading timeout"));
-				DucoTaskStopSerial(PLUGIN_LOG_PREFIX_153);
-				serialPortInUseByTask = 255;
+			if(serialPortInUseByTask == event->TaskIndex){
+				if( (millis() - ducoSerialStartReading) > PLUGIN_READ_TIMEOUT_153){
+					addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_153 + F("Serial reading timeout"));
+					DucoTaskStopSerial(PLUGIN_LOG_PREFIX_153);
+					serialPortInUseByTask = 255;
+				}
 			}
 		}
 		success = true;
@@ -159,8 +163,8 @@ boolean Plugin_153(byte function, struct EventStruct *event, String& string)
 						break;
 					}
 					case DUCO_MESSAGE_END: {
-				      DucoThrowErrorMessage(PLUGIN_LOG_PREFIX_152, result);
-						DucoTaskStopSerial(PLUGIN_LOG_PREFIX_152);
+				      DucoThrowErrorMessage(PLUGIN_LOG_PREFIX_153, result);
+						DucoTaskStopSerial(PLUGIN_LOG_PREFIX_153);
 						stop = true;
 						break;
 					}
@@ -173,6 +177,16 @@ boolean Plugin_153(byte function, struct EventStruct *event, String& string)
 
 
 
+	case PLUGIN_FIFTY_PER_SECOND: {
+		if(serialPortInUseByTask == event->TaskIndex){
+			if(serialSendCommandInProgress){
+				DucoSerialSendCommand(PLUGIN_LOG_PREFIX_153);
+			}
+		}
+
+	   success = true;
+    	break;
+  	}
 
 
 

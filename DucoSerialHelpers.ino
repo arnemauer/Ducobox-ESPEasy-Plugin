@@ -10,6 +10,8 @@ uint8_t duco_serial_buf[DUCO_SERIAL_BUFFER_SIZE];
 unsigned int duco_serial_bytes_read = 0;
 unsigned int duco_serial_rowCounter = 0; 
 
+uint8_t serialSendCommandCurrentChar = 0;
+bool serialSendCommandInProgress = false;
 /* To support non-blocking code, each plugins checks if the serial port is in use by another task before 
 claiming the serial port. After a task is done using the serial port the variable 'serialPortInUseByTask'
 is set to a default value '255'. 
@@ -23,7 +25,6 @@ plugin (serialPortInUseByTask=255) than it will call 'PLUGIN_READ' to start rece
 uint8_t serialPortInUseByTask = 255; 
 unsigned long ducoSerialStartReading; // filled with millis 
 
-
 typedef enum {
     DUCO_MESSAGE_END = 1, // status after receiving the end of a message (0x0d 0x20 0x20 )
     DUCO_MESSAGE_ROW_END = 2, // end of a row
@@ -34,40 +35,56 @@ typedef enum {
 } DucoSerialMessageStatus;
 
 
-int DucoSerialSendCommand(String logPrefix, const char *command)
-{
-    bool error=false;
+char serialSendCommand[30]; // sensorinfo, network, nodeparaget xx xx
+void DucoSerialStartSendCommand(const char *command){
+   	safe_strncpy(serialSendCommand, command, sizeof(serialSendCommand));
+	serialSendCommandCurrentChar = 0;
+	serialSendCommandInProgress = true; //start sending the serial command (in 50)
+    return;
+}
 
-    // DUCO throws random debug info on the serial, lets flush input buffer.
-    //DucoSerialFlush();
-    noInterrupts();
-    for (unsigned m = 0; m < strlen(command); m++) {
-       delay(10); // 20ms = buffer overrun while reading serial data. // ducosoftware uses +-15ms.
-       int bytesSend = Serial.write(command[m]);
-       if(bytesSend != 1){
-           error=true;
-           break;
+// non blocking serial send function
+// calling this function from 50persec. call this functions every 20ms :) 
+
+void DucoSerialSendCommand(String logPrefix) {
+
+    if(serialSendCommandCurrentChar == 0){
+        serialSendCommandInProgress = true;
+    }
+
+    if(serialSendCommandCurrentChar <= strlen(serialSendCommand)-1){
+        int bytesSend = Serial.write(serialSendCommand[serialSendCommandCurrentChar]);
+        if(bytesSend != 1){
+            addLog(LOG_LEVEL_ERROR, logPrefix + "Error, failed sending command. Clear command and buffer");
+
+            // press "enter" to clear send bytes.
+            Serial.write(0x0d);
+            delay(20);
+            Serial.write(0x0a);
+
+            serialSendCommandInProgress = false;
+            DucoTaskStopSerial(logPrefix);
+            //return false;
+        }else{
+            if(serialSendCommandCurrentChar >= (strlen(serialSendCommand)-1) ){
+                serialSendCommandInProgress = false;
+                addLog(LOG_LEVEL_DEBUG, logPrefix + "Send command successfull!");
+                //return false;
+            }else{
+                serialSendCommandCurrentChar++;
+                //return true;
+            }
         }
-    } // end of forloop
-    interrupts();
-
-    // if error: log, clear command and flush buffer!
-    if(error){
-        addLog(LOG_LEVEL_ERROR, logPrefix + "Error, failed sending command. Clear command and buffer");
-
-        // press "enter" to clear send bytes.
-        Serial.write(0x0d);
-        delay(20);
-        Serial.write(0x0a);
-
-       DucoSerialFlush();
-        return false;
 
     }else{
-        addLog(LOG_LEVEL_DEBUG, logPrefix + "Send command successfull!");
-        return true;
+        // counter is higher than number of chars
+        serialSendCommandInProgress = false;
+        //return false; 
     }
 } // end of DucoSerialSendCommand
+
+
+
 
 void DucoSerialFlush()
 {
@@ -84,6 +101,7 @@ void DucoSerialFlush()
 uint8_t DucoSerialInterrupt(){
 
     while (Serial.available() > 0) {
+        delay(0);
         duco_serial_buf[duco_serial_bytes_read] = Serial.read();
 
         if (duco_serial_buf[duco_serial_bytes_read] == 0x0d){
@@ -131,7 +149,7 @@ uint8_t DucoSerialReceiveRow(String logPrefix, long timeout, bool verbose)
                 addLog(LOG_LEVEL_INFO, logPrefix + "Package receive timeout.");
             }
             status = DUCO_MESSAGE_TIMEOUT;
-            DucoSerialFlush();
+            //DucoSerialFlush();
         }
     }
     

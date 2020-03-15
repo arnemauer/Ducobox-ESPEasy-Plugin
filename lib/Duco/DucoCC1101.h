@@ -65,15 +65,10 @@ class DucoCC1101 : protected CC1101
 		CC1101Packet inMessage;												//temp storage message
 		CC1101Packet outMessage;
 		
-		DucoPacket inDucoPacket;												//stores last received message data
-		
-		//send
-		DucoPacket outDucoPacket;												//stores state of "remote"
 
 		//settings
 		uint8_t sendTries;														//number of times a command is send at one button press
 		
-		void arrayToString(byte array[], unsigned int len, char buffer[]);
 
 
 		uint8_t deviceAddress;
@@ -124,7 +119,13 @@ class DucoCC1101 : protected CC1101
 	public:
 		DucoCC1101(uint8_t counter = 0, uint8_t sendTries = 2);		//set initial counter value
 		~DucoCC1101();
-		
+				
+		DucoPacket inDucoPacket;												//stores last received message data
+		DucoPacket outDucoPacket;												//stores state of "remote"
+
+		void arrayToString(byte array[], unsigned int len, char buffer[]);
+
+
 		//init
 		void init() { CC1101::init(); }											//init,reset CC1101
 		void reset();
@@ -179,6 +180,18 @@ class DucoCC1101 : protected CC1101
 
 		bool pollNewDeviceAddress();
 				
+		int convertRssiHexToDBm();
+
+
+		// TEST FUNCTIONS
+
+		uint8_t TEST_getVersion();
+		uint8_t TEST_getPartnumber();
+		void TEST_GDOTest();
+	//	DucoPacket TEST_getTestMessage();
+		void sendTestMessage();
+
+
 	protected:
 	private:
 		DucoCC1101( const DucoCC1101 &c);
@@ -205,7 +218,6 @@ class DucoCC1101 : protected CC1101
 
 		uint8_t updateMessageCounter();
 		uint8_t getRssi();
-		int convertRssiHexToDBm();
 
 		//parse received message
 		void parseReceivedPackets();

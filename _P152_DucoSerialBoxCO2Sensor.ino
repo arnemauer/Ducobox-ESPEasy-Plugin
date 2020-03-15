@@ -75,16 +75,16 @@ boolean Plugin_152(byte function, struct EventStruct *event, String& string)
 	}
       
 	case PLUGIN_INIT:{
-   	//LoadTaskSettings(event->TaskIndex);
-
-      Serial.begin(115200, SERIAL_8N1);
-      Plugin_152_init = true;
+		if(!ventilation_gateway_disable_serial){
+         Serial.begin(115200, SERIAL_8N1);
+         Plugin_152_init = true;
+      }
       success = true;
 		break;
    }
 
 	case PLUGIN_READ: {
-   	if (Plugin_152_init){
+   	if (Plugin_152_init && !ventilation_gateway_disable_serial){
 
          addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_152 + F("start read, eventid:") +event->TaskIndex);
 
@@ -106,20 +106,22 @@ boolean Plugin_152(byte function, struct EventStruct *event, String& string)
    }
 
 	case PLUGIN_ONCE_A_SECOND:{
-		if(P152_waitingForSerialPort){
-			if(serialPortInUseByTask == 255){
-				Plugin_152(PLUGIN_READ, event, string);
-				P152_waitingForSerialPort = false;
-			}
-		}
+      if(!ventilation_gateway_disable_serial){
+         if(P152_waitingForSerialPort){
+            if(serialPortInUseByTask == 255){
+               Plugin_152(PLUGIN_READ, event, string);
+               P152_waitingForSerialPort = false;
+            }
+         }
 
-		if(serialPortInUseByTask == event->TaskIndex){
-			if( (millis() - ducoSerialStartReading) > PLUGIN_READ_TIMEOUT_152){
-				addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_152 + F("Serial reading timeout"));
-				DucoTaskStopSerial(PLUGIN_LOG_PREFIX_152);
-            serialPortInUseByTask = 255;
-			}
-		}
+         if(serialPortInUseByTask == event->TaskIndex){
+            if( (millis() - ducoSerialStartReading) > PLUGIN_READ_TIMEOUT_152){
+               addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_152 + F("Serial reading timeout"));
+               DucoTaskStopSerial(PLUGIN_LOG_PREFIX_152);
+               serialPortInUseByTask = 255;
+            }
+         }
+      }
 
 		success = true;
 		break;
@@ -161,6 +163,16 @@ boolean Plugin_152(byte function, struct EventStruct *event, String& string)
 	}
 
 
+	case PLUGIN_FIFTY_PER_SECOND: {
+		if(serialPortInUseByTask == event->TaskIndex){
+			if(serialSendCommandInProgress){
+				DucoSerialSendCommand(PLUGIN_LOG_PREFIX_152);
+			}
+		}
+
+	   success = true;
+    	break;
+  	}
 
 
 
@@ -185,11 +197,17 @@ void startReadBoxSensors(String logPrefix){
 	duco_serial_rowCounter = 0; // reset row counter
 
    char command[] = "sensorinfo\r\n";
+	DucoSerialStartSendCommand(command);
+
+
+   /*
+   char command[] = "sensorinfo\r\n";
    int commandSendResult = DucoSerialSendCommand(logPrefix, command);
    if (!commandSendResult) {
       addLog(LOG_LEVEL_ERROR, logPrefix + F("Failed to send commando to Ducobox"));
       DucoTaskStopSerial(logPrefix);
    }
+   */
 }
 
 

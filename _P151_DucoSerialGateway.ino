@@ -10,11 +10,13 @@
 #define PLUGIN_NAME_151 "DUCO Serial Gateway"
 #define PLUGIN_VALUENAME1_151 "DUCO_STATUS" // networkcommand
 #define PLUGIN_VALUENAME2_151 "FLOW_PERCENTAGE"     // networkcommand
-#define PLUGIN_READ_TIMEOUT_151 1000
+#define PLUGIN_READ_TIMEOUT_151 3000
 #define PLUGIN_LOG_PREFIX_151 String("[P151] DUCO SER GW: ")
 #define DUCOBOX_NODE_NUMBER 1
 
 boolean Plugin_151_init = false;
+boolean ventilation_gateway_disable_serial = false;
+
 
 // 0 -> "auto" = AutomaticMode;
 // 1 -> "man1" = ManualMode1;
@@ -39,6 +41,7 @@ const int DucoStatusModesNumbers[DUCO_STATUS_MODUS_COUNT] =
 typedef enum {
 	P151_CONFIG_VALUE_TYPE = 0,
 	P151_CONFIG_LOG_SERIAL = 1,
+	P151_CONFIG_USE_FOR_NETWORK_TOOL = 2,
 } P151PluginConfigs; // max 8 values
 
 
@@ -112,6 +115,8 @@ boolean Plugin_151(byte function, struct EventStruct *event, String &string)
 
 	case PLUGIN_GET_DEVICEGPIONAMES:{
     	event->String1 = formatGpioName_output(F("Status LED"));
+    	event->String2 = formatGpioName_output(F("Use as Network Tool"));
+
     	break;
   	}
 
@@ -150,6 +155,7 @@ boolean Plugin_151(byte function, struct EventStruct *event, String &string)
 
 		if(PCONFIG(P151_CONFIG_VALUE_TYPE) == P151_VALUE_VENTMODE){
 			addFormCheckBox(F("Log serial messages to syslog"), F("Plugin151_log_serial"), PCONFIG(P151_CONFIG_LOG_SERIAL));
+			addFormCheckBox(F("Disable gateway serial to use gateway as usb-cable for network tool"), F("Plugin151_use_for_network_tool"), PCONFIG(P151_CONFIG_USE_FOR_NETWORK_TOOL));
 		}
 
 		success = true;
@@ -173,7 +179,8 @@ boolean Plugin_151(byte function, struct EventStruct *event, String &string)
 		}
 
 		if(PCONFIG(P151_CONFIG_VALUE_TYPE) == P151_VALUE_VENTMODE){
-	   	PCONFIG(P151_CONFIG_LOG_SERIAL) = isFormItemChecked(F("Plugin151_log_serial")); // no errors if this checkbox does not exist?
+	   	PCONFIG(P151_CONFIG_LOG_SERIAL) = isFormItemChecked(F("Plugin151_log_serial")); 
+	   	PCONFIG(P151_CONFIG_USE_FOR_NETWORK_TOOL) = isFormItemChecked(F("Plugin151_use_for_network_tool")); 
 		}
 
 	 	success = true;
@@ -181,20 +188,39 @@ boolean Plugin_151(byte function, struct EventStruct *event, String &string)
   }
 
 	case PLUGIN_INIT: {
-		//LoadTaskSettings(event->TaskIndex);
+		// if checkbox "use for network tool" is checked, Serial tx/rx of ducobox is swapped with tx/rx of usb converter
+		// We need to disable the RX/TX pin to prevent interference between the cp2104 and ducobox.
+		ventilation_gateway_disable_serial = PCONFIG(P151_CONFIG_USE_FOR_NETWORK_TOOL);
+		if(!ventilation_gateway_disable_serial){
 
-    	Serial.begin(115200, SERIAL_8N1);
-		Plugin_151_init = true;
+			// reset pinmode of RX and TX to default
+			pinMode(1, FUNCTION_0); // TX
+			pinMode(3, FUNCTION_0); // RX0
 
-		if(PCONFIG(P151_CONFIG_VALUE_TYPE) == P151_VALUE_VENTMODE){
-			P151_mainPluginActivatedInTask = true;
+			Serial.begin(115200, SERIAL_8N1);
+			Plugin_151_init = true;
+
+			if(PCONFIG(P151_CONFIG_VALUE_TYPE) == P151_VALUE_VENTMODE){
+				P151_mainPluginActivatedInTask = true;
+			}
+
+			if (CONFIG_PIN1 != -1){
+				pinMode(CONFIG_PIN1, OUTPUT);
+				digitalWrite(CONFIG_PIN1, HIGH);
+			}
+		}else{
+			// disable serial
+			Serial.end();
+
+			//put pins in input mode (High impedance) to prevent interference
+			pinMode(1, INPUT); // TX
+			pinMode(3, INPUT); // RX0
+
+			// set pin to control TS3A5017DRD16-M high
+			pinMode(2, OUTPUT); // gpio2 = D4
+			digitalWrite(CONFIG_PIN1, LOW); // default is high = gateway connected to ducobox
 		}
-
-		if (CONFIG_PIN1 != -1){
-			pinMode(CONFIG_PIN1, OUTPUT);
-			digitalWrite(CONFIG_PIN1, HIGH);
-		}
-
+		
 		success = true;
 		break;
   }
@@ -241,8 +267,9 @@ boolean Plugin_151(byte function, struct EventStruct *event, String &string)
 			uint8_t result =0;
 			bool stop = false;
 			
-			while( (result = DucoSerialInterrupt()) != DUCO_MESSAGE_FIFO_EMPTY && stop == false){
-
+			while(result != DUCO_MESSAGE_FIFO_EMPTY && stop == false){
+				result = DucoSerialInterrupt();
+					
 				switch(result){
 					case DUCO_MESSAGE_ROW_END: {
 						Plugin_151_processRow(event,  PCONFIG(P151_CONFIG_LOG_SERIAL));
@@ -294,6 +321,22 @@ boolean Plugin_151(byte function, struct EventStruct *event, String &string)
   	}
 
 
+	case PLUGIN_FIFTY_PER_SECOND: {
+		if(serialPortInUseByTask == event->TaskIndex){
+			if(serialSendCommandInProgress){
+				DucoSerialSendCommand(PLUGIN_LOG_PREFIX_151);
+			}
+		}
+
+	   success = true;
+    	break;
+  	}
+
+
+
+
+
+
 
   } // switch() end
 
@@ -311,13 +354,8 @@ void Plugin_151_startReadNetworkList(){
 	duco_serial_rowCounter = 0; // reset row counter
 
 	// SEND COMMAND
-	bool commandSendResult = DucoSerialSendCommand(PLUGIN_LOG_PREFIX_151, "Network\r\n");
-
-	// if succesfully send command then receive response
-	if (!commandSendResult) {
-      addLog(LOG_LEVEL_ERROR, PLUGIN_LOG_PREFIX_151 + F("Failed to send commando to Ducobox"));
-      DucoTaskStopSerial(PLUGIN_LOG_PREFIX_151);
-   }
+	DucoSerialStartSendCommand("Network\r\n");
+	//bool commandSendResult = DucoSerialSendCommand(PLUGIN_LOG_PREFIX_151, "Network\r\n");
 }
 
 
@@ -328,7 +366,7 @@ void Plugin_151_startReadNetworkList(){
 
 void Plugin_151_processRow(struct EventStruct *event, bool serialLoggingEnabled ){
     
-	if ( PCONFIG(P151_CONFIG_LOG_SERIAL) && duco_serial_rowCounter < 4){
+	if ( PCONFIG(P151_CONFIG_LOG_SERIAL)){
 		addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_151 + F("ROW:") + (duco_serial_rowCounter) + F(" bytes read:") + duco_serial_bytes_read);
 		DucoSerialLogArray(PLUGIN_LOG_PREFIX_151, duco_serial_buf, duco_serial_bytes_read, 0);
 	}

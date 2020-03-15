@@ -93,8 +93,7 @@ boolean Plugin_155(byte function, struct EventStruct *event, String& string){
 
 		case PLUGIN_INIT:{
       	//LoadTaskSettings(event->TaskIndex);        
-
-         if(!Plugin_155_init){
+         if(!Plugin_155_init && !ventilation_gateway_disable_serial){
             Serial.begin(115200, SERIAL_8N1);
             addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_155 + F("Init plugin done."));
 				P155_waitingForSerialPort[event->TaskIndex] = false;
@@ -106,7 +105,7 @@ boolean Plugin_155(byte function, struct EventStruct *event, String& string){
         }
 
     	case PLUGIN_READ:{
-        	if (Plugin_155_init && (PCONFIG(P155_CONFIG_NODE_ADDRESS) != 0) ){
+        	if (Plugin_155_init && (PCONFIG(P155_CONFIG_NODE_ADDRESS) != 0) && !ventilation_gateway_disable_serial){
 				  				addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_155 + F("start read, eventid:") +event->TaskIndex);
 
 
@@ -138,28 +137,31 @@ boolean Plugin_155(byte function, struct EventStruct *event, String& string){
 
 		
       case PLUGIN_ONCE_A_SECOND:{
-         if(P155_waitingForSerialPort[event->TaskIndex]){
-            if(serialPortInUseByTask == 255){
-               Plugin_155(PLUGIN_READ, event, string);
-               P155_waitingForSerialPort[event->TaskIndex] = false;
-            }
-         }
+			if(!ventilation_gateway_disable_serial){
 
-         if(P155_readHumidity){
-				if(serialPortInUseByTask == 255){
-					serialPortInUseByTask = event->TaskIndex;
-               startReadExternalSensors(PLUGIN_LOG_PREFIX_155, DUCO_DATA_EXT_SENSOR_RH, PCONFIG(P155_CONFIG_NODE_ADDRESS));
-					P155_readHumidity = false;
+				if(P155_waitingForSerialPort[event->TaskIndex]){
+					if(serialPortInUseByTask == 255){
+						Plugin_155(PLUGIN_READ, event, string);
+						P155_waitingForSerialPort[event->TaskIndex] = false;
+					}
+				}
+
+				if(P155_readHumidity){
+					if(serialPortInUseByTask == 255){
+						serialPortInUseByTask = event->TaskIndex;
+						startReadExternalSensors(PLUGIN_LOG_PREFIX_155, DUCO_DATA_EXT_SENSOR_RH, PCONFIG(P155_CONFIG_NODE_ADDRESS));
+						P155_readHumidity = false;
+					}
+				}
+
+				if(serialPortInUseByTask == event->TaskIndex){
+					if( (millis() - ducoSerialStartReading) > PLUGIN_READ_TIMEOUT_155){
+						addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_155 + F("Serial reading timeout"));
+						DucoTaskStopSerial(PLUGIN_LOG_PREFIX_155);
+						serialPortInUseByTask = 255;
+					}
 				}
 			}
-
-         if(serialPortInUseByTask == event->TaskIndex){
-            if( (millis() - ducoSerialStartReading) > PLUGIN_READ_TIMEOUT_155){
-               addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_155 + F("Serial reading timeout"));
-               DucoTaskStopSerial(PLUGIN_LOG_PREFIX_155);
-					serialPortInUseByTask = 255;
-            }
-         }
          success = true;
          break;
       }
@@ -206,6 +208,16 @@ boolean Plugin_155(byte function, struct EventStruct *event, String& string){
 	   }
 
 
+	case PLUGIN_FIFTY_PER_SECOND: {
+		if(serialPortInUseByTask == event->TaskIndex){
+			if(serialSendCommandInProgress){
+				DucoSerialSendCommand(PLUGIN_LOG_PREFIX_155);
+			}
+		}
+
+	   success = true;
+    	break;
+  	}
 
 
 		

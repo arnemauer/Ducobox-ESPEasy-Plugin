@@ -9,8 +9,6 @@
 #include <SPI.h>
 #include "DucoCC1101.h"
 #include "DucoPacket.h"
-#include <Ticker.h>
-
 
 //This extra settings struct is needed because the default settingsstruct doesn't support strings
 struct PLUGIN_150_ExtraSettingsStruct
@@ -89,7 +87,7 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 		
 			// check if task is enable and IRQ pin is set, if not than reset CC1101
 			if (Settings.TaskDeviceEnabled[event->TaskIndex] == false || Settings.TaskDevicePin1[event->TaskIndex] == -1) {
-				addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_150 + F("Task disabled, checking CC1101 needs a reset."));
+				addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_150 + F("Task disabled, checking if CC1101 needs a reset."));
 				if(PLUGIN_150_rf.getDucoDeviceState() != ducoDeviceState_notInitialised ){
 					PLUGIN_150_rf.reset(); // reset CC1101
 					detachInterrupt(Settings.TaskDevicePin1[event->TaskIndex]);
@@ -206,7 +204,7 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 				}
 			}
 
-			noInterrupts();
+			//noInterrupts();
 
 			PLUGIN_150_rf.checkForAck();
 			if(PLUGIN_150_rf.pollNewDeviceAddress()){
@@ -215,7 +213,7 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 				SaveCustomTaskSettings(event->TaskIndex, (byte*)&PLUGIN_150_ExtraSettings, sizeof(PLUGIN_150_ExtraSettings));
 			}
 			
-			interrupts();
+			//interrupts();
 
 
 			uint8_t numberOfLogMessages = PLUGIN_150_rf.getNumberOfLogMessages();
@@ -257,80 +255,104 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 			String cmd = parseString(tmpString, 1);
 			String param1 = parseString(tmpString, 2);
 
-			// check if task is enabled
-			if (Settings.TaskDeviceEnabled[event->TaskIndex]) {
+
 
 				if (cmd.equalsIgnoreCase(F("VENTMODE"))) {
-					//override ventilation with percentage
-					String param2 = parseString(tmpString, 3); 
-					uint8_t percentage = atoi(param2.c_str()); // if empty percentage will be 0
+					// check if task is enabled
+					if (Settings.TaskDeviceEnabled[event->TaskIndex]) {
+							//override ventilation with percentage
+						String param2 = parseString(tmpString, 3); 
+						uint8_t percentage = atoi(param2.c_str()); // if empty percentage will be 0
 
-					uint8_t ventilationMode = 0x99;
-					if (param1.equalsIgnoreCase(F("AUTO")))	{ 		  ventilationMode = 0x00;
-				//	}else if (param1.equalsIgnoreCase(F("HIGH10")))	{ ventilationMode = 0x01;
-				//	}else if (param1.equalsIgnoreCase(F("HIGH20")))	{ ventilationMode = 0x02;
-				//	}else if (param1.equalsIgnoreCase(F("HIGH30")))	{ ventilationMode = 0x03;
-					}else if (param1.equalsIgnoreCase(F("LOW")))	{ ventilationMode = 0x04;
-					}else if (param1.equalsIgnoreCase(F("MIDDLE")))	{ ventilationMode = 0x05;
-					}else if (param1.equalsIgnoreCase(F("HIGH")))	{ ventilationMode = 0x06;
-					}else if (param1.equalsIgnoreCase(F("NOTHOME"))){ ventilationMode = 0x07; 
-					}
+						uint8_t ventilationMode = 0x99;
+						if (param1.equalsIgnoreCase(F("AUTO")))	{ 		  ventilationMode = 0x00;
+					//	}else if (param1.equalsIgnoreCase(F("HIGH10")))	{ ventilationMode = 0x01;
+					//	}else if (param1.equalsIgnoreCase(F("HIGH20")))	{ ventilationMode = 0x02;
+					//	}else if (param1.equalsIgnoreCase(F("HIGH30")))	{ ventilationMode = 0x03;
+						}else if (param1.equalsIgnoreCase(F("LOW")))	{ ventilationMode = 0x04;
+						}else if (param1.equalsIgnoreCase(F("MIDDLE")))	{ ventilationMode = 0x05;
+						}else if (param1.equalsIgnoreCase(F("HIGH")))	{ ventilationMode = 0x06;
+						}else if (param1.equalsIgnoreCase(F("NOTHOME"))){ ventilationMode = 0x07; 
+						}
 
-					if(ventilationMode == 0x99){
-						addLog(LOG_LEVEL_INFO, PLUGIN_LOG_PREFIX_150 + F("Command 'VENTMODE' - unknown ventilation mode."));
-						printWebString += PLUGIN_LOG_PREFIX_150 + F("Command 'VENTMODE' - Unknown ventilation mode.");
+						if(ventilationMode == 0x99){
+							addLog(LOG_LEVEL_INFO, PLUGIN_LOG_PREFIX_150 + F("Command 'VENTMODE' - unknown ventilation mode."));
+							printWebString += PLUGIN_LOG_PREFIX_150 + F("Command 'VENTMODE' - Unknown ventilation mode.");
+						}else{
+							String log5 = PLUGIN_LOG_PREFIX_150 + F("Sent command for 'VENTMODE' & '") + param1 + F("' to DUCO unit");
+							addLog(LOG_LEVEL_INFO, log5);
+							printWebString += log5;
+
+							PLUGIN_150_rf.requestVentilationMode(ventilationMode,percentage,0xD2); // temp=210 = 21.0C	
+						}
+
+						success = true;
+
 					}else{
-						String log5 = PLUGIN_LOG_PREFIX_150 + F("Sent command for 'VENTMODE' & '") + param1 + F("' to DUCO unit");
-						addLog(LOG_LEVEL_INFO, log5);
-						printWebString += log5;
-
-						PLUGIN_150_rf.requestVentilationMode(ventilationMode,percentage,0xD2); // temp=210 = 21.0C	
+						addLog(LOG_LEVEL_INFO, PLUGIN_LOG_PREFIX_150 + F("Command ignored, please enable the task."));
+						printWebString += PLUGIN_LOG_PREFIX_150 + F("Command ignored, please enable the task.");
 					}
 
-					success = true;
 				}
 
 				else if (cmd.equalsIgnoreCase(F("JOIN")))
 					{
-						addLog(LOG_LEVEL_INFO, PLUGIN_LOG_PREFIX_150 + F("Sent command for 'join' to DUCO unit"));
-						printWebString += PLUGIN_LOG_PREFIX_150 + F("Sent command for 'join' to DUCO unit");
-						PLUGIN_150_rf.sendJoinPacket();
-						success = true;
+						// check if task is enabled
+						if (Settings.TaskDeviceEnabled[event->TaskIndex]) {
+
+								//override ventilation with percentage
+							addLog(LOG_LEVEL_INFO, PLUGIN_LOG_PREFIX_150 + F("Sent command for 'join' to DUCO unit"));
+							printWebString += PLUGIN_LOG_PREFIX_150 + F("Sent command for 'join' to DUCO unit");
+							PLUGIN_150_rf.sendJoinPacket();
+							success = true;
+
+						}else{
+							addLog(LOG_LEVEL_INFO, PLUGIN_LOG_PREFIX_150 + F("Command ignored, please enable the task."));
+							printWebString += PLUGIN_LOG_PREFIX_150 + F("Command ignored, please enable the task.");
+						}
+
 					}
 				else if (cmd.equalsIgnoreCase(F("DISJOIN")))
 					{
-						addLog(LOG_LEVEL_INFO, PLUGIN_LOG_PREFIX_150 + F("Sent command for 'disjoin' to DUCO unit"));
-						printWebString += PLUGIN_LOG_PREFIX_150 + F("Sent command for 'disjoin' to DUCO unit");
-						PLUGIN_150_rf.sendDisjoinPacket();
-						success = true;
+						// check if task is enabled
+						if (Settings.TaskDeviceEnabled[event->TaskIndex]) {
+							addLog(LOG_LEVEL_INFO, PLUGIN_LOG_PREFIX_150 + F("Sent command for 'disjoin' to DUCO unit"));
+							printWebString += PLUGIN_LOG_PREFIX_150 + F("Sent command for 'disjoin' to DUCO unit");
+							PLUGIN_150_rf.sendDisjoinPacket();
+							success = true;
+						}else{
+							addLog(LOG_LEVEL_INFO, PLUGIN_LOG_PREFIX_150 + F("Command ignored, please enable the task."));
+							printWebString += PLUGIN_LOG_PREFIX_150 + F("Command ignored, please enable the task.");
+						}
 					}		
 				else if (cmd.equalsIgnoreCase(F("INSTALLERMODE")))
 					{
 
-					if(param1.equalsIgnoreCase(F("OFF"))){
-						PLUGIN_150_rf.disableInstallerMode();
-						addLog(LOG_LEVEL_INFO, PLUGIN_LOG_PREFIX_150 + F("Sent command for disabling installermode."));
-						printWebString += PLUGIN_LOG_PREFIX_150 + F("Sent command for disabling installermode.");
-						success = true;
-					}else if(param1.equalsIgnoreCase(F("ON"))){
-						uint8_t ventilationState = PLUGIN_150_rf.getCurrentVentilationMode();
-						PLUGIN_150_rf.requestVentilationMode(ventilationState, 0x00, 0xD2, true); // temp=210 = 21.0C
-						addLog(LOG_LEVEL_INFO, PLUGIN_LOG_PREFIX_150 + F("Sent command for enabling installermode."));
-						printWebString += PLUGIN_LOG_PREFIX_150 + F("Sent command for enabling installermode.");
-						success = true;
+					// check if task is enabled
+					if (Settings.TaskDeviceEnabled[event->TaskIndex]) {
+						if(param1.equalsIgnoreCase(F("OFF"))){
+							PLUGIN_150_rf.disableInstallerMode();
+							addLog(LOG_LEVEL_INFO, PLUGIN_LOG_PREFIX_150 + F("Sent command for disabling installermode."));
+							printWebString += PLUGIN_LOG_PREFIX_150 + F("Sent command for disabling installermode.");
+							success = true;
+						}else if(param1.equalsIgnoreCase(F("ON"))){
+							uint8_t ventilationState = PLUGIN_150_rf.getCurrentVentilationMode();
+							PLUGIN_150_rf.requestVentilationMode(ventilationState, 0x00, 0xD2, true); // temp=210 = 21.0C
+							addLog(LOG_LEVEL_INFO, PLUGIN_LOG_PREFIX_150 + F("Sent command for enabling installermode."));
+							printWebString += PLUGIN_LOG_PREFIX_150 + F("Sent command for enabling installermode.");
+							success = true;
+						}
+					}else{
+						addLog(LOG_LEVEL_INFO, PLUGIN_LOG_PREFIX_150 + F("Command ignored, please enable the task."));
+						printWebString += PLUGIN_LOG_PREFIX_150 + F("Command ignored, please enable the task.");
 					}
-
-
-					}
+				}
 
 					uint8_t numberOfLogMessages = PLUGIN_150_rf.getNumberOfLogMessages();
 					for(int i=0; i< numberOfLogMessages;i++){
 						addLog(LOG_LEVEL_INFO, PLUGIN_LOG_PREFIX_150 + PLUGIN_150_rf.logMessages[i]);
 					}
-			}else{
-				addLog(LOG_LEVEL_INFO, PLUGIN_LOG_PREFIX_150 + F("Command ignored, please enable the task."));
-				printWebString += PLUGIN_LOG_PREFIX_150 + F("Command ignored, please enable the task.");
-			}
+
 			
 	  		break; 
 		}
@@ -463,7 +485,7 @@ void PLUGIN_150_DUCOcheck() {
 	// for debug purpose -> save millis to see how long it takes to run PLUGIN_150_DUCOcheck()
 
 	addLog(LOG_LEVEL_DEBUG,PLUGIN_LOG_PREFIX_150 + F("Start of RF signal received"));
-	noInterrupts();
+	//noInterrupts();
 
 	if (PLUGIN_150_rf.checkForNewPacket()){
 
@@ -486,7 +508,7 @@ void PLUGIN_150_DUCOcheck() {
          case 7: { PLUGIN_150_State = 4; break; } // modbus 7 = Niet-thuis-stand       convert to duco 4  = "empt" = EmptyHouse;
       }
 
-	interrupts();
+	//interrupts();
 	}else{
 		// CC1101 automaticly discards packets when CRC isn't OK.
 		addLog(LOG_LEVEL_DEBUG,PLUGIN_LOG_PREFIX_150 + F("Ignoring RF noise"));

@@ -8,6 +8,7 @@
 #include <Arduino.h>
 #include <SPI.h>
 
+
 // default constructor
 DucoCC1101::DucoCC1101(uint8_t counter, uint8_t sendTries) : CC1101()
 {
@@ -85,6 +86,7 @@ void DucoCC1101::initReceive()
 	PA ramping			enabled
 	Whitening			disabled
 	*/	
+	this->ducoDeviceState = ducoDeviceState_notInitialised;
 	writeCommand(CC1101_SRES);
 
 	writeRegister(CC1101_IOCFG0 ,0x2E);	//!!! 	//High impedance (3-state)
@@ -175,7 +177,8 @@ used to set the maximum packet length allowed in RX. Any packet received with a 
 	unsigned long startedWaiting = millis();
 	while((readRegisterWithSyncProblem(CC1101_MARCSTATE, CC1101_STATUS_REGISTER)) != CC1101_MARCSTATE_IDLE && millis() - startedWaiting <= 1000)
 	{
-		yield();
+		//esp_yield();
+		delay(0); // delay will call esp_yield()
 	}
 
 	if((readRegisterWithSyncProblem(CC1101_MARCSTATE, CC1101_STATUS_REGISTER)) != CC1101_MARCSTATE_IDLE){
@@ -191,7 +194,7 @@ used to set the maximum packet length allowed in RX. Any packet received with a 
 	startedWaiting = millis();
 	while((readRegisterWithSyncProblem(CC1101_MARCSTATE, CC1101_STATUS_REGISTER)) != CC1101_MARCSTATE_RX && millis() - startedWaiting <= 1000)
 	{
-		yield();
+		delay(0); // delay will call esp_yield()
 	}
 
 	if((readRegisterWithSyncProblem(CC1101_MARCSTATE, CC1101_STATUS_REGISTER)) != CC1101_MARCSTATE_RX){
@@ -199,9 +202,13 @@ used to set the maximum packet length allowed in RX. Any packet received with a 
 		return;
 	}	
 
-	//if(this->deviceAddress != 0x00){ remove this, when we want to join a network we have our address is 0.
-		this->ducoDeviceState = ducoDeviceState_initialised;
-	//}
+
+
+//	if(this->deviceAddress != 0x00){
+	this->ducoDeviceState = ducoDeviceState_initialised;
+//	}
+
+
 }
 
 
@@ -270,6 +277,9 @@ bool DucoCC1101::checkForNewPacket()
 			setLogMessage(F("Invalid packed length (<8)."));
 			return false;
 		}
+
+		// reset dataLength
+		inDucoPacket.dataLength = 0;
 
 		inDucoPacket.messageType = inMessage.data[0];
 
@@ -390,7 +400,6 @@ bool DucoCC1101::checkForNewPacket()
 							}
 							break;
 						}
-
 
 						default:{
 							setLogMessage(F("Received messagetype: unknown"));
@@ -557,6 +566,14 @@ void DucoCC1101::finishDisjoin(){
 
 void DucoCC1101::sendJoinPacket(){
 	setLogMessage(F("SendJoinPacket()"));
+
+	// remove networkID and deviceID, to receive the join messages me need to be in network 0000000 and address 0
+	this->networkId[0] = 0x00;
+	this->networkId[1] = 0x00;
+	this->networkId[2] = 0x00;
+	this->networkId[3] = 0x00;
+
+	this->deviceAddress = 0x00;
 
 	outDucoPacket.messageType = ducomsg_join1;	
 	outDucoPacket.sourceAddress =  0x01;
@@ -1220,3 +1237,56 @@ void DucoCC1101::disableInstallerMode(){
 }
 
 
+
+/* TEST FUNCTIONS! */
+
+uint8_t DucoCC1101::TEST_getVersion(){
+	uint8_t version = readRegister(0xF1);
+	return version;
+}
+
+uint8_t DucoCC1101::TEST_getPartnumber(){
+	uint8_t version = readRegister(0xF0);
+	return version;
+}
+
+void DucoCC1101::TEST_GDOTest(){
+	writeRegister(CC1101_IOCFG0 ,0x2E);	//High impedance (3-state)
+	writeRegister(CC1101_IOCFG1 ,0x2E); //High impedance (3-state)
+	writeRegister(CC1101_IOCFG2 ,0x3F);	// 135-141 kHz clock output (XOSC frequency divided by 192).
+}
+
+
+
+void DucoCC1101::sendTestMessage(){
+
+	outDucoPacket.messageType = ducomsg_message;
+	outDucoPacket.commandLength = 0;
+
+	outDucoPacket.data[0] = 0x47; // G
+	outDucoPacket.data[1] = 0x57; // W
+	outDucoPacket.data[2] = 0x54; // T
+	outDucoPacket.data[3] = 0x45; // E
+	outDucoPacket.data[4] = 0x53; // S
+	outDucoPacket.data[5] = 0x54; // T
+
+	outDucoPacket.dataLength = 6;
+ 
+	prefillDucoPacket(&outDucoPacket, 0x01); // address duco
+
+	outDucoPacket.counter = 0x08;
+	ducoToCC1101Packet(&outDucoPacket, &outMessage);
+
+	sendDataToDuco(&outMessage);
+	return;
+}
+
+/*
+DucoPacket* DucoCC1101::TEST_getTestMessage(){
+	if(!matchingNetworkId(inDucoPacket.networkId)){ // check for network id
+		// reset dataLength
+		inDucoPacket.dataLength = 0;
+	}
+	return inDucoPacket;
+}
+*/

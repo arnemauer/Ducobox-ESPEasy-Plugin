@@ -121,19 +121,18 @@ boolean Plugin_154(byte function, struct EventStruct *event, String& string){
 
 
 		case PLUGIN_INIT:{
-         if(!Plugin_154_init){
-            Serial.begin(115200, SERIAL_8N1);
-            addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_154 + F("Init plugin done."));
-            Plugin_154_init = true;
-            P154_waitingForSerialPort[event->TaskIndex] = false;
-         }
-
+            if(!Plugin_154_init && !ventilation_gateway_disable_serial){
+               Serial.begin(115200, SERIAL_8N1);
+               addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_154 + F("Init plugin done."));
+               Plugin_154_init = true;
+               P154_waitingForSerialPort[event->TaskIndex] = false;
+            }
 			success = true;
 			break;
         }
 
       case PLUGIN_READ:{
-        	if (Plugin_154_init && (PCONFIG(P154_CONFIG_NODE_ADDRESS) != 0) ){
+        	if (Plugin_154_init && (PCONFIG(P154_CONFIG_NODE_ADDRESS) != 0) && !ventilation_gateway_disable_serial){
 
             addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_154 + F("start read, eventid:") +event->TaskIndex);
 
@@ -152,7 +151,9 @@ boolean Plugin_154(byte function, struct EventStruct *event, String& string){
                }
 
             }else{
-				   addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_154 + F("Serial port in use, set flag to read data later."));
+               char serialPortInUse[40];
+               snprintf(serialPortInUse, sizeof(serialPortInUse)," %u, set flag to read data later.", serialPortInUseByTask);
+	            addLog(LOG_LEVEL_DEBUG,PLUGIN_LOG_PREFIX_154 + F("Serial port in use by taskid") + serialPortInUse );
                P154_waitingForSerialPort[event->TaskIndex] = true;
 
 			   }
@@ -163,18 +164,21 @@ boolean Plugin_154(byte function, struct EventStruct *event, String& string){
       }
 
       case PLUGIN_ONCE_A_SECOND:{
-         if(P154_waitingForSerialPort[event->TaskIndex]){
-            if(serialPortInUseByTask == 255){
-               Plugin_154(PLUGIN_READ, event, string);
-               P154_waitingForSerialPort[event->TaskIndex] = false;
+         if(!ventilation_gateway_disable_serial){
 
+            if(P154_waitingForSerialPort[event->TaskIndex]){
+               if(serialPortInUseByTask == 255){
+                  Plugin_154(PLUGIN_READ, event, string);
+                  P154_waitingForSerialPort[event->TaskIndex] = false;
+
+               }
             }
-         }
 
-         if(serialPortInUseByTask == event->TaskIndex){
-            if( (millis() - ducoSerialStartReading) > PLUGIN_READ_TIMEOUT_154){
-               addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_154 + F("Serial reading timeout"));
-               DucoTaskStopSerial(PLUGIN_LOG_PREFIX_154);
+            if(serialPortInUseByTask == event->TaskIndex){
+               if( (millis() - ducoSerialStartReading) > PLUGIN_READ_TIMEOUT_154){
+                  addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_154 + F("Serial reading timeout"));
+                  DucoTaskStopSerial(PLUGIN_LOG_PREFIX_154);
+               }
             }
          }
          success = true;
@@ -217,6 +221,19 @@ boolean Plugin_154(byte function, struct EventStruct *event, String& string){
 		   break;
 	   }
 
+
+      	case PLUGIN_FIFTY_PER_SECOND: {
+		if(serialPortInUseByTask == event->TaskIndex){
+			if(serialSendCommandInProgress){
+            DucoSerialSendCommand(PLUGIN_LOG_PREFIX_154);
+			}
+		}
+
+	   success = true;
+    	break;
+  	}
+
+
   }
   return success;
 }
@@ -257,6 +274,10 @@ void startReadExternalSensors(String logPrefix, uint8_t dataType, int nodeAddres
 
    // SEND COMMAND
    snprintf_P(command, sizeof(command), "nodeparaget %d %d\r\n", nodeAddress, parameter);
+	DucoSerialStartSendCommand(command);
+
+/*
+   snprintf_P(command, sizeof(command), "nodeparaget %d %d\r\n", nodeAddress, parameter);
    bool commandSendResult = DucoSerialSendCommand(logPrefix, command);
 
 	// if succesfully send command then receive response
@@ -264,6 +285,7 @@ void startReadExternalSensors(String logPrefix, uint8_t dataType, int nodeAddres
       addLog(LOG_LEVEL_ERROR, logPrefix + F("Failed to send commando to Ducobox"));
       DucoTaskStopSerial(logPrefix);
    }
+   */
 }
 
                 /* Example output:

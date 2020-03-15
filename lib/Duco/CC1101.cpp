@@ -31,7 +31,8 @@ inline void CC1101::deselect(void) {
 
 void CC1101::spi_waitMiso()
 {
-    while(digitalRead(MISO) == HIGH) yield();
+    while(digitalRead(MISO) == HIGH) delay(0); // delay will call esp_yield()
+
 }
 
 void CC1101::init()
@@ -283,9 +284,15 @@ void CC1101::sendData(CC1101Packet *packet)
 
 	//wait until transmission is finished (TXOFF_MODE is expected to be set to 3/RX)
 
+
+	//
+	// TODO: ADD some timeout!
+	//
 	do
 	{
 		//delay(1); // to prevent watchdog resets esp! We cant call yield here...
+		//esp_yield();
+		delay(0); // delay will call esp_yield()
 		MarcState = (readRegisterWithSyncProblem(CC1101_MARCSTATE, CC1101_STATUS_REGISTER) & CC1101_BITS_MARCSTATE);
 		if (MarcState == CC1101_MARCSTATE_TXFIFO_UNDERFLOW) Serial.print(F("TXFIFO_UNDERFLOW occured in sendData() \n"));
 	}
