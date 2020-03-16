@@ -10,18 +10,28 @@ De serial gateway sluit je met een kabel aan op de print van de Ducobox. Hierdoo
 
 Er zijn drie plugins voor de serial gateway:
 
-**DucoSerialGateway (P151)** 
+**DUCO Serial Gateway (P151)** 
 
-Deze plugin leest data over de ducobox zelf uit. Je kan hiermee de flow oftewel de snelheid van de ventilator (0 - 100%) uitlezen en de ventilatiestand (auto,laag,midden,hoog).
+Deze plugin leest data over de ducobox zelf uit. Je kan hiermee vier waarden uitlezen:
+1. Ventilatiestand (auto,laag,midden,hoog)
+2. Ventilatie percentage (0 - 100%)
+3. Ventilator percentage (snelheid van de ventilator (0 - 100%))
+4. Countdown (in seconden voordat de ducobox van de manuele stand zal terugschakelen naar AUTO)
 
-**DucoSerialBoxSensors (P152)**
-
+**DUCO Serial GW - Box Sensor - CO2 (koolstofdioxide in PPM) (P152)**
+**DUCO Serial GW - Box Sensor - CO2 (temperatuur) & luchtvochtigheidssensor (temperatuur en luchtvochtigheid) (P153)**
 Duco heeft een aantal boxsensoren die met een kabel aangesloten worden op de Ducobox. Deze boxsensoren kunnen elk afzonderlijk in een specifieke kanaalopening van de afvoerbox geklikt worden. Er is een CO2 boxsensor en een vocht boxsensor. Door deze plugin meerdere keren te activeren kun je meerdere boxsensoren uitlezen.
 
-**DucoSerialExternalSensors (P153)**
+- Uitlezen van een CO2 boxsensor: activeer P152 om de CO2 uit te lezen en activeer P153 om de temperatuur uit te lezen.
+- Uitlezen van een luchtvochtigheidsboxsensor: activeer P153 om de temperatuur en luchtvochtigheid uit te lezen.
 
-Er zijn diverse bedieningsschakelaars die je aan de Ducobox kan koppelen. Sommige bedieningsschakelaars hebben ook een sensor aan boord. Dit zijn de 'CO₂ Ruimtesensor - Bedieningsschakelaar' en de 'Vocht Ruimtesensor - Bedieningsschakelaar'. Alle bedieningsschakelaars vind je [hier](https://www.duco.eu/nl-nl-producten/nl-nl-luchtafvoer/nl-nl-sturingscomponenten/nl-nl-bedieningsschakelaar). Met deze plugin kun je de temperatuur, CO2 en vochtheidsgehalte uitlezen (afhankelijk van het type schakelaar). Door deze plugin meerdere keren te activeren kun je meerdere Bedieningsschakelaars uitlezen.
+**DUCO Serial GW - External CO2 Sensor (P154)**
+Er zijn diverse bedieningsschakelaars die je aan de Ducobox kan koppelen. Sommige bedieningsschakelaars hebben ook een sensor aan boord. Dit zijn de 'CO₂ Ruimtesensor - Bedieningsschakelaar' en de 'Vocht Ruimtesensor - Bedieningsschakelaar'. Alle bedieningsschakelaars vind je [hier](https://www.duco.eu/nl-nl-producten/nl-nl-luchtafvoer/nl-nl-sturingscomponenten/nl-nl-bedieningsschakelaar). 
 
+Met deze plugin kun je de CO2 en temperatuur uitlezen van een externe CO2 schakelaar. Door deze plugin meerdere keren te activeren kun je meerdere Bedieningsschakelaars uitlezen.
+
+**DUCO Serial GW - External Humidity Sensor (P155)**
+Met deze plugin kun je het vochtheidsgehalte en temperatuur uitlezen van een vochtruimtesensor bedieningsschakelaar. Door deze plugin meerdere keren te activeren kun je meerdere Bedieningsschakelaars uitlezen.
 
 ## Benodigde hardware:
 Je hebt in iedergeval een WEMOS D1 of een ander ESP8266 variant nodig. Je kan de RF gateway en de serial gateway combineren op één esp8266. Wat je nodig hebt voor de RF gateway vind je [hier](https://github.com/arnemauer/Ducobox-ESPEasy-Plugin/wiki/3.-RF-Gateway---Hardware) en voor de serial gateway vind je [hier](https://github.com/arnemauer/Ducobox-ESPEasy-Plugin/wiki/6.-Serial-GW---Hardware).
