@@ -19,18 +19,22 @@ Deze plugin leest data over de ducobox zelf uit. Je kan hiermee vier waarden uit
 4. Countdown (in seconden voordat de ducobox van de manuele stand zal terugschakelen naar AUTO)
 
 **DUCO Serial GW - Box Sensor - CO2 (koolstofdioxide in PPM) (P152)**
+
 **DUCO Serial GW - Box Sensor - CO2 (temperatuur) & luchtvochtigheidssensor (temperatuur en luchtvochtigheid) (P153)**
+
 Duco heeft een aantal boxsensoren die met een kabel aangesloten worden op de Ducobox. Deze boxsensoren kunnen elk afzonderlijk in een specifieke kanaalopening van de afvoerbox geklikt worden. Er is een CO2 boxsensor en een vocht boxsensor. Door deze plugin meerdere keren te activeren kun je meerdere boxsensoren uitlezen.
 
 - Uitlezen van een CO2 boxsensor: activeer P152 om de CO2 uit te lezen en activeer P153 om de temperatuur uit te lezen.
 - Uitlezen van een luchtvochtigheidsboxsensor: activeer P153 om de temperatuur en luchtvochtigheid uit te lezen.
 
 **DUCO Serial GW - External CO2 Sensor (P154)**
+
 Er zijn diverse bedieningsschakelaars die je aan de Ducobox kan koppelen. Sommige bedieningsschakelaars hebben ook een sensor aan boord. Dit zijn de 'CO₂ Ruimtesensor - Bedieningsschakelaar' en de 'Vocht Ruimtesensor - Bedieningsschakelaar'. Alle bedieningsschakelaars vind je [hier](https://www.duco.eu/nl-nl-producten/nl-nl-luchtafvoer/nl-nl-sturingscomponenten/nl-nl-bedieningsschakelaar). 
 
 Met deze plugin kun je de CO2 en temperatuur uitlezen van een externe CO2 schakelaar. Door deze plugin meerdere keren te activeren kun je meerdere Bedieningsschakelaars uitlezen.
 
 **DUCO Serial GW - External Humidity Sensor (P155)**
+
 Met deze plugin kun je het vochtheidsgehalte en temperatuur uitlezen van een vochtruimtesensor bedieningsschakelaar. Door deze plugin meerdere keren te activeren kun je meerdere Bedieningsschakelaars uitlezen.
 
 ## Benodigde hardware:
