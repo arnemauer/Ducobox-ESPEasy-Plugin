@@ -95,11 +95,11 @@ boolean Plugin_155(byte function, struct EventStruct *event, String& string){
       	//LoadTaskSettings(event->TaskIndex);        
          if(!Plugin_155_init && !ventilation_gateway_disable_serial){
             Serial.begin(115200, SERIAL_8N1);
-            addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_155 + F("Init plugin done."));
-				P155_waitingForSerialPort[event->TaskIndex] = false;
-            Plugin_155_init = true;
-         }
 
+         }
+         addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_155 + F("Init plugin done."));
+			P155_waitingForSerialPort[event->TaskIndex] = false;
+         Plugin_155_init = true;
 			success = true;
 			break;
         }

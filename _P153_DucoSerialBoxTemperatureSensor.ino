@@ -8,7 +8,7 @@
 
 #define PLUGIN_153
 #define PLUGIN_ID_153           153
-#define PLUGIN_NAME_153         "DUCO Serial GW - Box Sensor - CO2 (temp) & humidity sensor (temp & hum)"
+#define PLUGIN_NAME_153         "DUCO Serial GW - Box Sensor - Temperature & humidity sensor"
 #define PLUGIN_READ_TIMEOUT_153   1000 // DUCOBOX askes "live" CO2 sensor info, so answer takes sometimes a second.
 #define PLUGIN_LOG_PREFIX_153   String("[P153] DUCO BOX SENSOR: ")
 
@@ -92,8 +92,8 @@ boolean Plugin_153(byte function, struct EventStruct *event, String& string)
 	case PLUGIN_INIT:{
 		if(!ventilation_gateway_disable_serial){
 			Serial.begin(115200, SERIAL_8N1);
-			Plugin_153_init = true;
 		}
+		Plugin_153_init = true;
       success = true;
       break;
    }

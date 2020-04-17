@@ -77,8 +77,9 @@ boolean Plugin_152(byte function, struct EventStruct *event, String& string)
 	case PLUGIN_INIT:{
 		if(!ventilation_gateway_disable_serial){
          Serial.begin(115200, SERIAL_8N1);
-         Plugin_152_init = true;
       }
+      
+      Plugin_152_init = true;
       success = true;
 		break;
    }

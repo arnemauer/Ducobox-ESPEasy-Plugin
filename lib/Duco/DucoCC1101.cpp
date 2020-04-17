@@ -493,6 +493,7 @@ void DucoCC1101::processNetworkPacket(){
 		default:
 			/* 
 			If databyte is higer than 1, it is a broadcast for a specific the node number!
+			Duco packettype = LINK (coreloglevel debug)
 			*/
 			setLogMessage(F("Network message -> call to specific node"));
 		break;
@@ -508,8 +509,10 @@ void DucoCC1101::processNetworkPacket(){
 	// copy data from incoming network package 
 	outDucoPacket.data[0] = inDucoPacket.data[1];
 	outDucoPacket.dataLength = 1;
- 
- 	prefillDucoPacket(&outDucoPacket, 0x00, inDucoPacket.originalDestinationAddress, inDucoPacket.originalSourceAddress); 
+ 	outDucoPacket.messageType = ducomsg_network;
+
+ 	prefillDucoPacket(&outDucoPacket, 0x00, inDucoPacket.originalSourceAddress, inDucoPacket.originalDestinationAddress); 
+
 	outDucoPacket.counter = inDucoPacket.counter;
 	ducoToCC1101Packet(&outDucoPacket, &outMessage);
 
@@ -727,7 +730,7 @@ void DucoCC1101::checkForAck(){
 	}
 }
 
-bool DucoCC1101::matchingNetworkId(uint8_t id[])
+bool DucoCC1101::matchingNetworkId(uint8_t id[4]) 
 {
 	for (uint8_t i=0; i<3;i++){
 		if (id[i] != this->networkId[i]){

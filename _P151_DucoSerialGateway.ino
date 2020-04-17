@@ -13,6 +13,7 @@
 #define PLUGIN_READ_TIMEOUT_151 3000
 #define PLUGIN_LOG_PREFIX_151 String("[P151] DUCO SER GW: ")
 #define DUCOBOX_NODE_NUMBER 1
+#define PLUGIN_151_SERIALSWITCH_PIN 2
 
 boolean Plugin_151_init = false;
 boolean ventilation_gateway_disable_serial = false;
@@ -134,7 +135,6 @@ boolean Plugin_151(byte function, struct EventStruct *event, String &string)
 	}
 
 	case PLUGIN_WEBFORM_LOAD: {
-
 		addRowLabel(F("Output Value Type"));
 		addSelector_Head(PCONFIG_LABEL(P151_CONFIG_VALUE_TYPE), false);
 
@@ -188,37 +188,50 @@ boolean Plugin_151(byte function, struct EventStruct *event, String &string)
   }
 
 	case PLUGIN_INIT: {
-		// if checkbox "use for network tool" is checked, Serial tx/rx of ducobox is swapped with tx/rx of usb converter
-		// We need to disable the RX/TX pin to prevent interference between the cp2104 and ducobox.
-		ventilation_gateway_disable_serial = PCONFIG(P151_CONFIG_USE_FOR_NETWORK_TOOL);
-		if(!ventilation_gateway_disable_serial){
+		
+		// load tasksettings, if we dont call this function, PCONFIG (Settings.TaskDevicePluginConfig) will be 0.
+      LoadTaskSettings(event->TaskIndex);
 
-			// reset pinmode of RX and TX to default
-			pinMode(1, FUNCTION_0); // TX
-			pinMode(3, FUNCTION_0); // RX0
-
-			Serial.begin(115200, SERIAL_8N1);
-			Plugin_151_init = true;
-
-			if(PCONFIG(P151_CONFIG_VALUE_TYPE) == P151_VALUE_VENTMODE){
-				P151_mainPluginActivatedInTask = true;
-			}
-
-			if (CONFIG_PIN1 != -1){
-				pinMode(CONFIG_PIN1, OUTPUT);
-				digitalWrite(CONFIG_PIN1, HIGH);
-			}
-		}else{
-			// disable serial
-			Serial.end();
-
-			//put pins in input mode (High impedance) to prevent interference
-			pinMode(1, INPUT); // TX
-			pinMode(3, INPUT); // RX0
 
 			// set pin to control TS3A5017DRD16-M high
-			pinMode(2, OUTPUT); // gpio2 = D4
-			digitalWrite(CONFIG_PIN1, LOW); // default is high = gateway connected to ducobox
+			pinMode(PLUGIN_151_SERIALSWITCH_PIN, OUTPUT); // gpio2 = D4
+
+			// only initiate serial if we are the task with main plugin activated.
+			if(PCONFIG(P151_CONFIG_VALUE_TYPE) == P151_VALUE_VENTMODE){
+				P151_mainPluginActivatedInTask = true;
+
+				// set status led
+				if (CONFIG_PIN1 != -1){
+					pinMode(CONFIG_PIN1, OUTPUT);
+					digitalWrite(CONFIG_PIN1, HIGH);
+				}
+			
+				// if checkbox "use for network tool" is checked, Serial tx/rx of ducobox is swapped with tx/rx of usb converter
+				// We need to disable the RX/TX pin to prevent interference between the cp2104 and ducobox.
+				ventilation_gateway_disable_serial = PCONFIG(P151_CONFIG_USE_FOR_NETWORK_TOOL);
+
+				if(!ventilation_gateway_disable_serial){
+					digitalWrite(PLUGIN_151_SERIALSWITCH_PIN, HIGH); // default is high = gateway connected to ducobox
+
+					// reset pinmode of RX and TX to default
+					pinMode(1, FUNCTION_0); // TX
+					pinMode(3, FUNCTION_0); // RX0
+
+					Serial.begin(115200, SERIAL_8N1);
+
+				}else{
+					// disable serial
+					Serial.end();
+
+					//put pins in input mode (High impedance) to prevent interference
+					pinMode(1, INPUT); // TX
+					pinMode(3, INPUT); // RX0
+
+					// set pin to control TS3A5017DRD16-M high
+					digitalWrite(PLUGIN_151_SERIALSWITCH_PIN, LOW); // default is high = gateway connected to ducobox
+				}
+				
+			Plugin_151_init = true;
 		}
 		
 		success = true;
@@ -258,7 +271,8 @@ boolean Plugin_151(byte function, struct EventStruct *event, String &string)
 	case PLUGIN_SERIAL_IN: {
 
 		// if we unexpectedly receive data we need to flush and return success=true so espeasy won't interpret it as an serial command.
-		if(serialPortInUseByTask == 255){
+		// also ignore data if serial is disabled 
+		if(serialPortInUseByTask == 255 || ventilation_gateway_disable_serial){
 			DucoSerialFlush();
 			success = true;
 		}
@@ -292,12 +306,12 @@ boolean Plugin_151(byte function, struct EventStruct *event, String &string)
 
 	case PLUGIN_READ:{
 
-		if(Plugin_151_init && PCONFIG(P151_CONFIG_VALUE_TYPE) == P151_VALUE_VENTMODE){
+		if(Plugin_151_init && PCONFIG(P151_CONFIG_VALUE_TYPE) == P151_VALUE_VENTMODE && !ventilation_gateway_disable_serial){
 			// check if serial port is in use by another task, otherwise set flag.
 			if(serialPortInUseByTask == 255){
 				serialPortInUseByTask = event->TaskIndex;
 				
-				if (CONFIG_PIN1 != -1){
+				if (CONFIG_PIN1 != -1){ // status led
 					digitalWrite(CONFIG_PIN1, LOW);
 				}
 				Plugin_151_startReadNetworkList();

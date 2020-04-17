@@ -123,10 +123,10 @@ boolean Plugin_154(byte function, struct EventStruct *event, String& string){
 		case PLUGIN_INIT:{
             if(!Plugin_154_init && !ventilation_gateway_disable_serial){
                Serial.begin(115200, SERIAL_8N1);
-               addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_154 + F("Init plugin done."));
-               Plugin_154_init = true;
-               P154_waitingForSerialPort[event->TaskIndex] = false;
             }
+         addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_154 + F("Init plugin done."));
+         Plugin_154_init = true;
+         P154_waitingForSerialPort[event->TaskIndex] = false;
 			success = true;
 			break;
         }

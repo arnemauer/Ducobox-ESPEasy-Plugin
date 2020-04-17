@@ -419,7 +419,7 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 
 
     	case PLUGIN_WEBFORM_LOAD: {
-			addFormSubHeader(F("Remote RF Controls"));
+			addFormSubHeader(F("Remote RF Controls (automaticly filled after succesfull join)"));
 			char tempNetworkId [9];
 			char tempBuffer[20];
 
