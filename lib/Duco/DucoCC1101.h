@@ -15,7 +15,7 @@
 #define CC1101_WRITE_BURST						0x40
 
 //pa table settings
-const uint8_t ducoPaTableReceive[8] = {0xC5, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+//const uint8_t ducoPaTableReceive[8] = {0x50, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 
 const uint8_t joinCO2NetworkId[4] = {0x00,0x00,0x7C,0x3E};
 
@@ -72,6 +72,7 @@ class DucoCC1101 : protected CC1101
 
 
 		uint8_t deviceAddress;
+		uint8_t radioPower;
 		uint8_t networkId[4];
 
 		uint8_t pingCounter;
@@ -145,7 +146,11 @@ class DucoCC1101 : protected CC1101
 		void setDeviceAddress(uint8_t deviceAddress){ this->deviceAddress = deviceAddress; }
 		uint8_t getDeviceAddress() { return deviceAddress; }	
 
-		//deviceid
+		//get/set radio power
+		void setRadioPower(uint8_t radioPower){ this->radioPower = radioPower; }
+		uint8_t getRadioPower() { return radioPower; }	
+
+		//networkid
 		void setNetworkId(uint8_t newNetworkId[]){ 
 			memcpy(networkId, newNetworkId, 4);
 		}

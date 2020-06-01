@@ -35,6 +35,7 @@ bool PLUGIN_150_InitRunned = false;
 typedef enum {
 	P150_CONFIG_DEVICE_ADDRESS = 0,
    P150_CONFIG_LOG_RF = 1,
+	P150_CONFIG_RADIO_POWER = 2,
 } P150PluginConfigs;
 
 
@@ -42,6 +43,31 @@ typedef enum {
 void PLUGIN_150_interruptHandler() ICACHE_RAM_ATTR;
 volatile uint8_t PLUGIN_150_IRQ = false; //!<  irq flag
 volatile unsigned long test_interrupt_counter;
+
+// DUCO default = 0xC1 and HIGH = 0xC0
+typedef enum {
+	P150_RADIO_POWER_DEFAULT = 0, // 0,6 dBm = 0x8D
+	P150_RADIO_POWER_1 = 1, //  10,3 dBm = 0xC1
+	P150_RADIO_POWER_2 = 2, //   5,0 dBm = 0x81
+	P150_RADIO_POWER_3 = 3, // -5.0 dBm = 0x67
+	P150_RADIO_POWER_4 = 4, // -20 dBm  = 0x0F
+} P150RadioPowerValues;
+
+uint8_t P150_radio_power_value[5] = {0x8D, 0xC1, 0x81, 0x67, 0x0F};
+
+#define P150_RADIO_POWER_OUTPUT_OPTIONS 5
+String Plugin_150_radiopower_valuename(byte value_nr) {
+	switch (value_nr) {
+		case P150_RADIO_POWER_DEFAULT: return F("Default - radio power 0,6 dBm (0x8D)");
+		case P150_RADIO_POWER_1:  return F("Radio power 10,3 dBm (0xC1)");
+		case P150_RADIO_POWER_2:  return F("Radio power 5,0 dBm (0x81)");
+		case P150_RADIO_POWER_3:  return F("Radio power -5,0 dBm (0x67)");
+		case P150_RADIO_POWER_4:  return F("Radio power -20 dBm (0x0F) - lowest");
+		default:
+      break;
+  	}
+  	return "";
+}
 
 boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 {
@@ -80,10 +106,16 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
         	break;
       }
 
-  
+    case PLUGIN_SET_DEFAULTS:{
+    	PCONFIG(P150_CONFIG_DEVICE_ADDRESS) = 0;
+		PCONFIG(P150_CONFIG_LOG_RF) = 0;
+    	PCONFIG(P150_CONFIG_RADIO_POWER) = P150_RADIO_POWER_DEFAULT;
+
+    	success = true;
+    	break;
+  	}
   		
 		case PLUGIN_INIT: {
-		
 		
 			// check if task is enable and IRQ pin is set, if not than reset CC1101
 			if (Settings.TaskDeviceEnabled[event->TaskIndex] == false || Settings.TaskDevicePin1[event->TaskIndex] == -1) {
@@ -110,13 +142,16 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 				PLUGIN_150_rf.init();
 				PLUGIN_150_rf.setDeviceAddress(PCONFIG(P150_CONFIG_DEVICE_ADDRESS));
 				PLUGIN_150_rf.setNetworkId(PLUGIN_150_ExtraSettings.networkId);
-
+				PLUGIN_150_rf.setRadioPower(P150_radio_power_value[PCONFIG(P150_CONFIG_RADIO_POWER)]);
+								
 				String log4 = PLUGIN_LOG_PREFIX_150 + "Values set from config. DeviceID: ";
 				log4 += PLUGIN_150_rf.getDeviceAddress();
-				log4 += F(" and networkId: ");
+				log4 += F(", networkId: ");
 				for (uint8_t i=0; i<=3; i++){
 					log4 += String(PLUGIN_150_ExtraSettings.networkId[i], HEX);
 				}
+				log4 += F(", radio power: ");
+				log4 += Plugin_150_radiopower_valuename(PCONFIG(P150_CONFIG_RADIO_POWER));
 				addLog(LOG_LEVEL_INFO, log4);
 
 				// set pinmode for CC1101 interrupt pin
@@ -255,8 +290,6 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 			String cmd = parseString(tmpString, 1);
 			String param1 = parseString(tmpString, 2);
 
-
-
 				if (cmd.equalsIgnoreCase(F("VENTMODE"))) {
 					// check if task is enabled
 					if (Settings.TaskDeviceEnabled[event->TaskIndex]) {
@@ -265,14 +298,14 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 						uint8_t percentage = atoi(param2.c_str()); // if empty percentage will be 0
 
 						uint8_t ventilationMode = 0x99;
-						if (param1.equalsIgnoreCase(F("AUTO")))	{ 		  ventilationMode = 0x00;
-					//	}else if (param1.equalsIgnoreCase(F("HIGH10")))	{ ventilationMode = 0x01;
-					//	}else if (param1.equalsIgnoreCase(F("HIGH20")))	{ ventilationMode = 0x02;
-					//	}else if (param1.equalsIgnoreCase(F("HIGH30")))	{ ventilationMode = 0x03;
-						}else if (param1.equalsIgnoreCase(F("LOW")))	{ ventilationMode = 0x04;
-						}else if (param1.equalsIgnoreCase(F("MIDDLE")))	{ ventilationMode = 0x05;
-						}else if (param1.equalsIgnoreCase(F("HIGH")))	{ ventilationMode = 0x06;
-						}else if (param1.equalsIgnoreCase(F("NOTHOME"))){ ventilationMode = 0x07; 
+						if (param1.equalsIgnoreCase(F("AUTO")))	{ 		  	ventilationMode = 0x00;
+						}else if (param1.equalsIgnoreCase(F("HIGH10")))	{ 	ventilationMode = 0x01;
+						}else if (param1.equalsIgnoreCase(F("HIGH20")))	{ 	ventilationMode = 0x02;
+						}else if (param1.equalsIgnoreCase(F("HIGH30")))	{ 	ventilationMode = 0x03;
+						}else if (param1.equalsIgnoreCase(F("LOW")))	{ 		ventilationMode = 0x04;
+						}else if (param1.equalsIgnoreCase(F("MIDDLE")))	{ 	ventilationMode = 0x05;
+						}else if (param1.equalsIgnoreCase(F("HIGH")))	{ 	ventilationMode = 0x06;
+						}else if (param1.equalsIgnoreCase(F("NOTHOME"))){ 	ventilationMode = 0x07; 
 						}
 
 						if(ventilationMode == 0x99){
@@ -363,13 +396,18 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 			if(PLUGIN_150_InitRunned){
 				switch(PLUGIN_150_State){
 					case 0:  {  ventMode = "Automatic (0)"; break; } // modbus 0 = auto                   convert to duco 0  = "auto" = AutomaticMode;
-					case 21: {  ventMode = "Boost10min (21)"; break; } // modbus 1 = 10 minuten hoogstand   convert to duco 21 = "aut1" = Boost10min;
-					case 22: {  ventMode = "Boost20min (22)"; break; } // modbus 2 = 20 minuten hoogstand   convert to duco 22 = "aut2" = Boost20min;
-					case 23: {  ventMode = "Boost30min (23)"; break; } // modbus 3 = 30 minuten hoogstand   convert to duco 23 = "aut3" = Boost30min;
 					case 1:  {  ventMode = "ManualMode1 (1)"; break; } // modbus 4 = Manuele laagstand      convert to duco 1  = "man1" = ManualMode1;
 					case 2:  {  ventMode = "ManualMode2 (2)"; break; } // modbus 5 = Manuele middenstand    convert to duco 2  = "man2" = ManualMode2; 
 					case 3:  {  ventMode = "ManualMode3 (3)"; break; } // modbus 6 = Manuele hoogstand      convert to duco 3  = "man3" = ManualMode3; 
 					case 4:  {  ventMode = "EmptyHouse (4)"; break; } // modbus 7 = Niet-thuis-stand       convert to duco 4  = "empt" = EmptyHouse;
+
+					case 12:  {  ventMode = "PermanentManualMode1 (12)"; break; } // 	= continu LOW		       convert to duco 4  = "cnt1" = PermanentManualMode1;
+					case 13:  {  ventMode = "PermanentManualMode2 (13)"; break; } //   = continu MIDDLE       convert to duco 4  = "cnt2" = PermanentManualMode2;
+					case 14:  {  ventMode = "PermanentManualMode3 (14)"; break; } //   = continu HIGH       convert to duco 4  = "cnt3" = PermanentManualMode3;
+
+					case 21: {  ventMode = "Boost10min (21)"; break; } // modbus 1 = 10 minuten hoogstand   convert to duco 21 = "aut1" = Boost10min;
+					case 22: {  ventMode = "Boost20min (22)"; break; } // modbus 2 = 20 minuten hoogstand   convert to duco 22 = "aut2" = Boost20min;
+					case 23: {  ventMode = "Boost30min (23)"; break; } // modbus 3 = 30 minuten hoogstand   convert to duco 23 = "aut3" = Boost30min;
 					default: {  ventMode = "NA"; break; };
 				}
 			}else{
@@ -437,7 +475,19 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 			sprintf(&tempDeviceAddress[0],"%d", PCONFIG(P150_CONFIG_DEVICE_ADDRESS));
 
 			addFormTextBox( F("Device Address"), F("PLUGIN_150_DEVICEADDRESS"), tempDeviceAddress, 3);
-			addFormCheckBox(F("Log rf messages to syslog"), F("Plugin150_log_rf"), PCONFIG(P150_CONFIG_LOG_RF));
+
+			// Selector for Radio power
+			addRowLabel(F("Radio Power"));
+			addSelector_Head(PCONFIG_LABEL(P150_CONFIG_RADIO_POWER), false);
+
+			for (byte x = 0; x < P150_RADIO_POWER_OUTPUT_OPTIONS; x++){
+				String name     = Plugin_150_radiopower_valuename(x);
+				addSelector_Item(name, x, PCONFIG(P150_CONFIG_RADIO_POWER) == x, false, "");
+			}
+			addSelector_Foot();
+			// Selector for Radio power
+
+			addFormCheckBox(F("Log rf messages to syslog"), PCONFIG_LABEL(P150_CONFIG_LOG_RF), PCONFIG(P150_CONFIG_LOG_RF));
 
 			success = true;
 			break;
@@ -451,7 +501,8 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 			}
 
 			PCONFIG(P150_CONFIG_DEVICE_ADDRESS) = atoi(WebServer.arg(F("PLUGIN_150_DEVICEADDRESS")).c_str());
-			PCONFIG(P150_CONFIG_LOG_RF) = isFormItemChecked(F("Plugin150_log_rf"));
+			PCONFIG(P150_CONFIG_RADIO_POWER) = getFormItemInt(PCONFIG_LABEL(P150_CONFIG_RADIO_POWER), 0);
+			PCONFIG(P150_CONFIG_LOG_RF) = isFormItemChecked(PCONFIG_LABEL(P150_CONFIG_LOG_RF));
 
 			SaveCustomTaskSettings(event->TaskIndex, (byte*)&PLUGIN_150_ExtraSettings, sizeof(PLUGIN_150_ExtraSettings));
 			success = true;
@@ -506,6 +557,10 @@ void PLUGIN_150_DUCOcheck() {
          case 5: { PLUGIN_150_State = 2; break; } // modbus 5 = Manuele middenstand    convert to duco 2  = "man2" = ManualMode2; 
          case 6: { PLUGIN_150_State = 3; break; } // modbus 6 = Manuele hoogstand      convert to duco 3  = "man3" = ManualMode3; 
          case 7: { PLUGIN_150_State = 4; break; } // modbus 7 = Niet-thuis-stand       convert to duco 4  = "empt" = EmptyHouse;
+			case 12:  {  PLUGIN_150_State = 12; break; } // 	= continu LOW		       convert to duco 4  = "cnt1" = PermanentManualMode1;
+			case 13:  {  PLUGIN_150_State = 13; break; } //   = continu MIDDLE       convert to duco 4  = "cnt2" = PermanentManualMode2;
+			case 14:  {  PLUGIN_150_State = 14; break; } //   = continu HIGH       convert to duco 4  = "cnt3" = PermanentManualMode3;
+
       }
 
 	//interrupts();

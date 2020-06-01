@@ -15,6 +15,7 @@ DucoCC1101::DucoCC1101(uint8_t counter, uint8_t sendTries) : CC1101()
 	this->outDucoPacket.counter = counter;
 	this->sendTries = sendTries;
 	this->deviceAddress = 0;
+	this->radioPower = 0xC1; // default radio power 0xC1 = 10,3dBm @ 868mhz
 	this->waitingForAck = 0; 
 	this->ackTimer = 0;
 	this->ackRetry = 0;
@@ -164,6 +165,10 @@ used to set the maximum packet length allowed in RX. Any packet received with a 
 	
 	//0x6F,0x26,0x2E,0x7F,0x8A,0x84,0xCA,0xC4
 	// DUCO: 0xC5, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+
+
+	uint8_t ducoPaTableReceive[8] = {this->radioPower, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+
 	writeBurstRegister(CC1101_PATABLE | CC1101_WRITE_BURST, (uint8_t*)ducoPaTableReceive, 8);
 	
 	writeCommand(CC1101_SIDLE);
@@ -601,6 +606,8 @@ void DucoCC1101::sendJoinPacket(){
 	ducoDeviceState = ducoDeviceState_join1;
 }
 
+
+// TODO: split this function in receiveJoin2Packet and sendJoin3Packet
 void DucoCC1101::sendJoin3Packet(){
 	setLogMessage(F("sendJoin3Packet()"));
 
@@ -613,7 +620,6 @@ void DucoCC1101::sendJoin3Packet(){
 			if(inDucoPacket.data[1+i] == joinCO2NetworkId[i]){
 				validJoin2Packet = true;
 				ducoDeviceState = ducoDeviceState_join2;
-
 			}else{
 				validJoin2Packet = false;
 				break;
@@ -817,7 +823,7 @@ void DucoCC1101::parseMessageCommand()
 		if( (inDucoPacket.data[2] == 0x00) && (inDucoPacket.data[3] == 0x12)){
 			setLogMessage(F("Received change ventilation command"));
 
-			if((inDucoPacket.data[4] < 7)){ //CHECK IF ventilationmode has a valid value
+			if((inDucoPacket.data[4] < 30)){ //CHECK IF ventilationmode has a valid value
 				currentVentilationMode = inDucoPacket.data[4];
 
 				//  Bevestiging van wijziging  ventilatiestand (door node)	0x40 0x00 0x22
