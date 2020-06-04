@@ -669,23 +669,6 @@ bool DucoCC1101::joinPacketValidNetworkId(){
 	return false;
 }
 
-<<<<<<< Updated upstream
-	if(validJoin4Packet){
-		setLogMessage(F("sendJoinFinish: valid join4 packet received!"));
-		if(inDucoPacket.data[5] == inDucoPacket.data[6]){
-			this->deviceAddress = inDucoPacket.data[5]; // = new address	
-
-			char logBuf[100];
-			snprintf(logBuf, sizeof(logBuf), "sendJoinFinish: new device address is: %u;",this->deviceAddress);
-			setLogMessage(logBuf);
-
-			// send ack! from new deviceaddress to address of sender.
-			sendAck();
-			setLogMessage(F("sendJoinFinish: ACK sent!"));
-			ducoDeviceState = ducoDeviceState_joinSuccessful;
-=======
-
-
 void DucoCC1101::processJoin4Packet(){
 	// A join4 message is send to the networkID of the Ducobox (networkID is set by a join2 message). Check for matching network ID
 	if(matchingNetworkId(inDucoPacket.networkId)){
@@ -693,12 +676,12 @@ void DucoCC1101::processJoin4Packet(){
 			sendJoin4FinishPacket();
 		}else{
 			setLogMessage(F("processJoin4Packet: invalid join4 packet received, can't find joinCO2NetworkId in data."));
->>>>>>> Stashed changes
 		}
 	}else{
 			setLogMessage(F("processJoin4Packet: invalid join4 packet received, not our network ID."));
 	}
 }
+
 
 
 // data of a join4 message: 00 00 7C 3E XX YY
