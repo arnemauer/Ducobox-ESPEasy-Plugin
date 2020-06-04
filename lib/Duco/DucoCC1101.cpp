@@ -686,18 +686,17 @@ void DucoCC1101::sendJoinFinish(){
 
 	if(validJoin4Packet){
 		setLogMessage(F("sendJoinFinish: valid join4 packet received!"));
-		if(inDucoPacket.data[5] == inDucoPacket.data[6]){
-			this->deviceAddress = inDucoPacket.data[5]; // = new address	
+		this->deviceAddress = inDucoPacket.data[5]; // = new address	
+		//this->nodeNumber = inDucoPacket.data[6]; // = nodenumber -> do we need to save this somewhere?
+		char logBuf[100];
+		snprintf(logBuf, sizeof(logBuf), "sendJoinFinish: new device address is: %u;",this->deviceAddress);
+		setLogMessage(logBuf);
 
-			char logBuf[100];
-			snprintf(logBuf, sizeof(logBuf), "sendJoinFinish: new device address is: %u;",this->deviceAddress);
-			setLogMessage(logBuf);
-
-			// send ack! from new deviceaddress to address of sender.
-			sendAck();
-			setLogMessage(F("sendJoinFinish: ACK sent!"));
-			ducoDeviceState = ducoDeviceState_joinSuccessful;
-		}
+		// send ack! from new deviceaddress to address of sender.
+		sendAck();
+		setLogMessage(F("sendJoinFinish: ACK sent!"));
+		ducoDeviceState = ducoDeviceState_joinSuccessful;
+		
 	}else{
 		setLogMessage(F("sendJoinFinish: INVALID join4 packet received!"));
 	}
