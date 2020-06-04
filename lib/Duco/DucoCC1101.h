@@ -144,7 +144,7 @@ class DucoCC1101 : protected CC1101
 
 		//deviceid
 		void setDeviceAddress(uint8_t deviceAddress){ this->deviceAddress = deviceAddress; }
-		uint8_t getDeviceAddress() { return deviceAddress; }	
+		uint8_t getDeviceAddress() { return this->deviceAddress; }	
 
 		//get/set radio power
 		void setRadioPower(uint8_t radioPower){ this->radioPower = radioPower; }
@@ -214,9 +214,14 @@ class DucoCC1101 : protected CC1101
 
  		String byteToHexString(uint8_t b);
 
-		// joinCO2NetworkId
+		void processJoin2Packet();
 		void sendJoin3Packet();
-		void sendJoinFinish();
+		bool joinPacketValidNetworkId();
+		
+		void processJoin4Packet();
+		void sendJoin4FinishPacket();
+
+
 		void finishDisjoin();
 
 		void processNetworkPacket();
