@@ -246,6 +246,11 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 				memcpy(PLUGIN_150_ExtraSettings.networkId, PLUGIN_150_rf.getnetworkID(), 4); //convert char array to uint8_t
 				PCONFIG(P150_CONFIG_DEVICE_ADDRESS) = PLUGIN_150_rf.getDeviceAddress();
 				SaveCustomTaskSettings(event->TaskIndex, (byte*)&PLUGIN_150_ExtraSettings, sizeof(PLUGIN_150_ExtraSettings));
+<<<<<<< Updated upstream
+=======
+				SaveTaskSettings(event->TaskIndex);
+    			SaveSettings();
+>>>>>>> Stashed changes
 			}
 			
 			//interrupts();
