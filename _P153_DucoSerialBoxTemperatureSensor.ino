@@ -70,7 +70,7 @@ boolean Plugin_153(byte function, struct EventStruct *event, String& string)
     case PLUGIN_WEBFORM_LOAD: {
 
 		addRowLabel(F("Sensor type:"));
-		addSelector_Head(PCONFIG_LABEL(P153_CONFIG_DEVICE), false);
+		addSelector_Head(PCONFIG_LABEL(P153_CONFIG_DEVICE));
 
 		addSelector_Item("", P152_DUCO_DEVICE_NA, PCONFIG(P153_CONFIG_DEVICE) == P152_DUCO_DEVICE_NA, false, "");
 		addSelector_Item("CO2 Sensor (Temperature)", P152_DUCO_DEVICE_CO2_TEMP, PCONFIG(P153_CONFIG_DEVICE) == P152_DUCO_DEVICE_CO2_TEMP, false, "");
