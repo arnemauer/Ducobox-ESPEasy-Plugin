@@ -246,6 +246,7 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 				PCONFIG(P150_CONFIG_DEVICE_ADDRESS) = PLUGIN_150_rf.getDeviceAddress();
 				SaveCustomTaskSettings(event->TaskIndex, (byte*)&PLUGIN_150_ExtraSettings, sizeof(PLUGIN_150_ExtraSettings));
 				SaveTaskSettings(event->TaskIndex);
+    		SaveSettings();
 			}
 			
 			uint8_t numberOfLogMessages = PLUGIN_150_rf.getNumberOfLogMessages();
