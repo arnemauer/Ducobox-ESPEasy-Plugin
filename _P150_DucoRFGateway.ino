@@ -239,23 +239,16 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 				}
 			}
 
-			//noInterrupts();
-
 			PLUGIN_150_rf.checkForAck();
+
 			if(PLUGIN_150_rf.pollNewDeviceAddress()){
 				memcpy(PLUGIN_150_ExtraSettings.networkId, PLUGIN_150_rf.getnetworkID(), 4); //convert char array to uint8_t
 				PCONFIG(P150_CONFIG_DEVICE_ADDRESS) = PLUGIN_150_rf.getDeviceAddress();
 				SaveCustomTaskSettings(event->TaskIndex, (byte*)&PLUGIN_150_ExtraSettings, sizeof(PLUGIN_150_ExtraSettings));
-<<<<<<< Updated upstream
-=======
 				SaveTaskSettings(event->TaskIndex);
-    			SaveSettings();
->>>>>>> Stashed changes
+    		SaveSettings();
 			}
 			
-			//interrupts();
-
-
 			uint8_t numberOfLogMessages = PLUGIN_150_rf.getNumberOfLogMessages();
 			for(int i=0; i< numberOfLogMessages;i++){
 				addLog(LOG_LEVEL_INFO, PLUGIN_LOG_PREFIX_150 + PLUGIN_150_rf.logMessages[i]);
@@ -509,6 +502,7 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 			PCONFIG(P150_CONFIG_LOG_RF) = isFormItemChecked(PCONFIG_LABEL(P150_CONFIG_LOG_RF));
 
 			SaveCustomTaskSettings(event->TaskIndex, (byte*)&PLUGIN_150_ExtraSettings, sizeof(PLUGIN_150_ExtraSettings));
+			
 			success = true;
 			break;
     	}	

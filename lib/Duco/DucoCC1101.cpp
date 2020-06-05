@@ -391,17 +391,16 @@ bool DucoCC1101::checkForNewPacket()
 
 							// if we are waiting for join confirmation, finish joining
 							}else if(ducoDeviceState == ducoDeviceState_join3){
-								sendJoinFinish();	
+								processJoin4Packet();
 							}else{
 								// if ducobox didnt receive the first ack (from sendJoinFinish()), check if address in packet is the same and send ack again!
 								setLogMessage(F("Received join4 message but join already finished, check address and resend ACK."));
 								if(inDucoPacket.data[5] == this->deviceAddress){
 									sendAck();
-									setLogMessage(F("SendJoinFinish: another ACK sent!"));
+									setLogMessage(F("sendJoin4FinishPacket: another ACK sent!"));
 								}else{
-									setLogMessage(F("No match between join4 address and our deviceid. ingoring message..."));
+									setLogMessage(F("No match between join4 address and our deviceid. Ignoring message."));
 								}
-								setLogMessage(F("Ignore JOIN4. No join or disjoin action running..."));
 							}
 							break;
 						}
@@ -429,11 +428,10 @@ bool DucoCC1101::checkForNewPacket()
 					if(ducoDeviceState == ducoDeviceState_join1){
 						sendJoin3Packet();
 					}else{
-						setLogMessage(F("Ignoring because GW status is not JOIN1"));
+						setLogMessage(F("Ignoring join 2 message because gateway ducoDeviceState isn't JOIN1."));
 					}
 					break;
 				}
-
 				default:{
 					setLogMessage(F("Ignore message, not our networkID."));
 					break;
@@ -602,104 +600,109 @@ void DucoCC1101::sendJoinPacket(){
 
 	sendDataToDuco(&outMessage);
 	//finishTransfer();
-	setLogMessage(F("Joinpacket sent"));
+	setLogMessage(F("Joinpacket sent. DucoDeviceState = ducoDeviceState_join1"));
 	ducoDeviceState = ducoDeviceState_join1;
 }
 
 
+
 // TODO: split this function in receiveJoin2Packet and sendJoin3Packet
-void DucoCC1101::sendJoin3Packet(){
-	setLogMessage(F("sendJoin3Packet()"));
+void DucoCC1101::processJoin2Packet(){
+	setLogMessage(F("processJoin2Packet()"));
 
-	bool validJoin2Packet = false;
-
-	if((inDucoPacket.sourceAddress == 0x01) && (inDucoPacket.destinationAddress == 0x00)){
-
-		// check if network id is in command
-		for(int i=0; i<4;i++){
-			if(inDucoPacket.data[1+i] == joinCO2NetworkId[i]){
-				validJoin2Packet = true;
-				ducoDeviceState = ducoDeviceState_join2;
-			}else{
-				validJoin2Packet = false;
-				break;
-			}
-		}
-	}
-
-	if(validJoin2Packet){
+	// check if joinCO2NetworkId is in data
+	if(joinPacketValidNetworkId()){
 		setLogMessage(F("SendJoin3Packet: valid join2 packet received!"));
-
-		outDucoPacket.sourceAddress =  0x00;
-		outDucoPacket.destinationAddress = 0x01;
-		outDucoPacket.originalSourceAddress =  0x00;
-		outDucoPacket.originalDestinationAddress = 0x01;
-
-		// update networkid
-		memcpy(this->networkId, &inDucoPacket.networkId,4);
-
-		// send response
-		outDucoPacket.messageType = ducomsg_join3;
-		
-		memcpy(outDucoPacket.networkId,networkId,4 );
-
-		//co2 = 00 00 7C 3E -- Batt Remote = 00 00 00 00
-		for(int i=0; i<4;i++)
-		outDucoPacket.command[i] = joinCO2NetworkId[i];
-
-		outDucoPacket.commandLength = 4;
-		outDucoPacket.data[0] = 0x0C;
-		outDucoPacket.dataLength = 1;
-
-		outDucoPacket.counter = 0x0D; // counter is always 13 for join3 message! (for battery remote!!!)
-		ducoToCC1101Packet(&outDucoPacket, &outMessage);
-
-		sendDataToDuco(&outMessage);
-		setLogMessage(F("sendJoinFinish: join3 message sent!"));
-		ducoDeviceState = ducoDeviceState_join3;
-
+		sendJoin3Packet();
 	}else{
+		// cant find joinCO2NetworkId in data
 		setLogMessage(F("SendJoin3Packet: INVALID join2 packet received!"));
 	}
 }
 
-void DucoCC1101::sendJoinFinish(){
-	setLogMessage(F("sendJoinFinish()"));
-	bool validJoin4Packet = false;
 
-	if(matchingNetworkId(inDucoPacket.networkId)){
+void DucoCC1101::sendJoin3Packet(){
+	outDucoPacket.sourceAddress =  0x00;
+	outDucoPacket.destinationAddress = 0x01;
+	outDucoPacket.originalSourceAddress =  0x00;
+	outDucoPacket.originalDestinationAddress = 0x01;
 
+	// update networkid
+	memcpy(this->networkId, &inDucoPacket.networkId,4);
+
+	// send response
+	outDucoPacket.messageType = ducomsg_join3;
+		
+	memcpy(outDucoPacket.networkId,networkId,4 );
+
+	//co2 = 00 00 7C 3E -- Batt Remote = 00 00 00 00
+	for(int i=0; i<4;i++)
+	outDucoPacket.command[i] = joinCO2NetworkId[i];
+
+	outDucoPacket.commandLength = 4;
+	outDucoPacket.data[0] = 0x0C;
+	outDucoPacket.dataLength = 1;
+
+	outDucoPacket.counter = 0x0D; // counter is always 13 for join3 message! (for battery remote!!!)
+	ducoToCC1101Packet(&outDucoPacket, &outMessage);
+
+	sendDataToDuco(&outMessage);
+	setLogMessage(F("sendJoin3Packet: join3 message sent. DucoDeviceState = ducoDeviceState_join3"));
+	ducoDeviceState = ducoDeviceState_join3;
+}
+
+
+bool DucoCC1101::joinPacketValidNetworkId(){
+	setLogMessage(F("joinPacketValidNetworkId()"));
 		if((inDucoPacket.sourceAddress == 0x01) && (inDucoPacket.destinationAddress == 0x00)){
 			// check if network id is in command
 			for(int i=0; i<4;i++){
 				if(inDucoPacket.data[1+i] == joinCO2NetworkId[i]){
-					validJoin4Packet = true;
-					ducoDeviceState = ducoDeviceState_join4;
-
+					if(i==3){ 
+						return true;
+					}
 				}else{
-					validJoin4Packet = false;
-					break;
+					return false;
 				}
 			}
 		}
-	}
+	return false;
+}
 
-	if(validJoin4Packet){
-		setLogMessage(F("sendJoinFinish: valid join4 packet received!"));
-		this->deviceAddress = inDucoPacket.data[5]; // = new address	
-		//this->nodeNumber = inDucoPacket.data[6]; // = nodenumber -> do we need to save this somewhere?
-		char logBuf[100];
-		snprintf(logBuf, sizeof(logBuf), "sendJoinFinish: new device address is: %u;",this->deviceAddress);
-		setLogMessage(logBuf);
-
-		// send ack! from new deviceaddress to address of sender.
-		sendAck();
-		setLogMessage(F("sendJoinFinish: ACK sent!"));
-		ducoDeviceState = ducoDeviceState_joinSuccessful;
-		
+void DucoCC1101::processJoin4Packet(){
+	// A join4 message is send to the networkID of the Ducobox (networkID is set by a join2 message). Check for matching network ID
+	if(matchingNetworkId(inDucoPacket.networkId)){
+		if(joinPacketValidNetworkId()){
+			sendJoin4FinishPacket();
+		}else{
+			setLogMessage(F("processJoin4Packet: invalid join4 packet received, can't find joinCO2NetworkId in data."));
+		}
 	}else{
-		setLogMessage(F("sendJoinFinish: INVALID join4 packet received!"));
+			setLogMessage(F("processJoin4Packet: invalid join4 packet received, not our network ID."));
 	}
+}
+
+
+
+// data of a join4 message: 00 00 7C 3E XX YY
+// XX = network address
+// YY = node number
+void DucoCC1101::sendJoin4FinishPacket(){
+	ducoDeviceState = ducoDeviceState_join4;
+
+	setLogMessage(F("sendJoinFinish: valid join4 packet received!"));
+	this->deviceAddress = inDucoPacket.data[5]; // = new address	
+	//this->nodeNumber = inDucoPacket.data[6]; // = nodenumber -> do we need to save this somewhere?
+
+	char logBuf[50];
+	snprintf(logBuf, sizeof(logBuf), "sendJoinFinish: new device address is: %u;",this->deviceAddress);
+	setLogMessage(logBuf);
+
+	// send ack! from new deviceaddress to address of sender.
+	sendAck();
+	setLogMessage(F("sendJoinFinish: ACK sent!"));
+	ducoDeviceState = ducoDeviceState_joinSuccessful;
+
 }
 
 
