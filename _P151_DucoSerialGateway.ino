@@ -136,7 +136,7 @@ boolean Plugin_151(byte function, struct EventStruct *event, String &string)
 
 	case PLUGIN_WEBFORM_LOAD: {
 		addRowLabel(F("Output Value Type"));
-		addSelector_Head(PCONFIG_LABEL(P151_CONFIG_VALUE_TYPE), false);
+		addSelector_Head(PCONFIG_LABEL(P151_CONFIG_VALUE_TYPE));
 
 		for (byte x = 0; x < P151_NR_OUTPUT_OPTIONS; x++){
 			String name     = Plugin_151_valuename(x, true);

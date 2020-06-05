@@ -91,7 +91,7 @@ boolean Plugin_154(byte function, struct EventStruct *event, String& string){
 
          addHtml(F("<TR><TD>Sensor type:<TD>"));
          byte choice = PCONFIG(P154_CONFIG_DEVICE);
-         addSelector(String(F("Plugin_154_DEVICE_TYPE")), 3, options, NULL, NULL, choice, true);
+         addSelector(String(F("Plugin_154_DEVICE_TYPE")), 3, options, NULL, NULL, choice, true, true);
          addFormNumericBox(F("Sensor Node address"), F("Plugin_154_NODE_ADDRESS"), PCONFIG(P154_CONFIG_NODE_ADDRESS), 0, 5000);
          addFormCheckBox(F("Log serial messages to syslog"), F("Plugin154_log_serial"), PCONFIG(P154_CONFIG_LOG_SERIAL));
 

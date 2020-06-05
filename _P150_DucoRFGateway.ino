@@ -294,7 +294,6 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 			String tmpString = string;
 			String cmd = parseString(tmpString, 1);
 			String param1 = parseString(tmpString, 2);
-
 				if (cmd.equalsIgnoreCase(F("VENTMODE"))) {
 					// check if task is enabled
 					if (Settings.TaskDeviceEnabled[event->TaskIndex]) {
@@ -483,7 +482,7 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 
 			// Selector for Radio power
 			addRowLabel(F("Radio Power"));
-			addSelector_Head(PCONFIG_LABEL(P150_CONFIG_RADIO_POWER), false);
+			addSelector_Head(PCONFIG_LABEL(P150_CONFIG_RADIO_POWER));
 
 			for (byte x = 0; x < P150_RADIO_POWER_OUTPUT_OPTIONS; x++){
 				String name     = Plugin_150_radiopower_valuename(x);
@@ -499,13 +498,13 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
     	}
 
     	case PLUGIN_WEBFORM_SAVE:{
-			unsigned long number = strtoul( WebServer.arg(F("PLUGIN_150_NETWORKID")).c_str(), nullptr, 16);
+			unsigned long number = strtoul( web_server.arg(F("PLUGIN_150_NETWORKID")).c_str(), nullptr, 16);
 			for(int i=3; i>=0; i--){    // start with lowest byte of number
 				PLUGIN_150_ExtraSettings.networkId[i] = number & 0xFF;  // or: = byte( number);
 				number >>= 8;            // get next byte into position
 			}
 
-			PCONFIG(P150_CONFIG_DEVICE_ADDRESS) = atoi(WebServer.arg(F("PLUGIN_150_DEVICEADDRESS")).c_str());
+			PCONFIG(P150_CONFIG_DEVICE_ADDRESS) = atoi(web_server.arg(F("PLUGIN_150_DEVICEADDRESS")).c_str());
 			PCONFIG(P150_CONFIG_RADIO_POWER) = getFormItemInt(PCONFIG_LABEL(P150_CONFIG_RADIO_POWER), 0);
 			PCONFIG(P150_CONFIG_LOG_RF) = isFormItemChecked(PCONFIG_LABEL(P150_CONFIG_LOG_RF));
 
