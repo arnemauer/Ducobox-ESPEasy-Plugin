@@ -246,7 +246,7 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 				PCONFIG(P150_CONFIG_DEVICE_ADDRESS) = PLUGIN_150_rf.getDeviceAddress();
 				SaveCustomTaskSettings(event->TaskIndex, (byte*)&PLUGIN_150_ExtraSettings, sizeof(PLUGIN_150_ExtraSettings));
 				SaveTaskSettings(event->TaskIndex);
-    		SaveSettings();
+    			SaveSettings();
 			}
 			
 			uint8_t numberOfLogMessages = PLUGIN_150_rf.getNumberOfLogMessages();
@@ -376,7 +376,58 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 						addLog(LOG_LEVEL_INFO, PLUGIN_LOG_PREFIX_150 + F("Command ignored, please enable the task."));
 						printWebString += PLUGIN_LOG_PREFIX_150 + F("Command ignored, please enable the task.");
 					}
-				}
+			
+
+
+					}		
+					else if (cmd.equalsIgnoreCase(F("DUCOTESTMESSAGE")))
+					{
+
+						
+						// MESSAGETYPE
+						uint8_t messageType = atoi(param1.c_str()); // if empty value will be 0
+
+						// sourceAddress
+						String param2 = parseString(tmpString, 3);  // 
+						uint8_t sourceAddress = atoi(param2.c_str()); // if empty value will be 0
+
+						// destinationAddress
+						String param3 = parseString(tmpString, 4); 
+						uint8_t destinationAddress = atoi(param3.c_str()); // if empty value will be 0
+
+						// originalSourceAddress
+						String param4 = parseString(tmpString, 5); 
+						uint8_t originalSourceAddress = atoi(param4.c_str()); // if empty value will be 0
+
+						// originalDestinationAddress
+						String param5 = parseString(tmpString, 6); 
+						uint8_t originalDestinationAddress = atoi(param5.c_str()); // if empty value will be 0
+
+						String param6 = parseString(tmpString, 7); 
+						char hexValues[40];
+						param6.toCharArray(hexValues, 40);
+
+						unsigned char hexArray[20];
+						uint8_t dataBytes = 0;
+						PLUGIN_150_hexstringToHex(hexValues, hexArray, &dataBytes);
+
+						uint8_t* myuint8array = (uint8_t*)hexArray;
+						PLUGIN_150_rf.sendRawPacket(messageType, sourceAddress, destinationAddress, originalSourceAddress, originalDestinationAddress, myuint8array, dataBytes);
+
+							String log6 = PLUGIN_LOG_PREFIX_150 + F("Sent DUCOTESTMESSAGE to Duco Network: ");
+							log6 += messageType + ",";
+							log6 += sourceAddress + ",";
+							log6 += destinationAddress + ",";
+							log6 += originalSourceAddress + ",";
+							log6 += originalDestinationAddress + ",";
+							log6 += "bytes:";
+							log6 += dataBytes;
+
+							addLog(LOG_LEVEL_INFO, log6);
+							printWebString += log6;
+							success = true;
+					}
+
 
 					uint8_t numberOfLogMessages = PLUGIN_150_rf.getNumberOfLogMessages();
 					for(int i=0; i< numberOfLogMessages;i++){
@@ -514,6 +565,12 @@ return success;
 
 
 
+
+
+
+
+
+
 // IRQ handler:
 void PLUGIN_150_interruptHandler(void)
 {
@@ -580,4 +637,18 @@ void PLUGIN_150_Publishdata(struct EventStruct *event) {
    String log = PLUGIN_LOG_PREFIX_150 + " State: ";
    log += UserVar[event->BaseVarIndex];
    addLog(LOG_LEVEL_DEBUG, log);
+}
+
+
+
+void PLUGIN_150_hexstringToHex(char *hexString, unsigned char *hexArray, uint8_t *length ){
+	 const char *pos = hexString;
+
+     /* WARNING: no sanitization or error-checking whatsoever */
+    for (size_t count = 0; count < sizeof hexArray/sizeof *hexArray; count++) {
+        sscanf(pos, "%2hhx", &hexArray[count]);
+        pos += 2;
+		  length++;
+    }
+
 }

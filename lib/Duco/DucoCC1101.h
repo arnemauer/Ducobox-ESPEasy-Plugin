@@ -109,7 +109,7 @@ class DucoCC1101 : protected CC1101
 
 
 		//String logMessages[10]; // to store some log messages from library
-		#define NUMBER_OF_LOG_STRING 10
+		#define NUMBER_OF_LOG_STRING 13
 		#define MAX_LOG_STRING_SIZE 250
 
 		uint8_t numberOfLogmessages = 0;
@@ -167,6 +167,8 @@ class DucoCC1101 : protected CC1101
 
 		uint8_t getMarcState(bool noLogMessage);
 
+
+		void sendRawPacket(uint8_t messageType, uint8_t sourceAddress, uint8_t destinationAddress, uint8_t originalSourceAddress, uint8_t originalDestinationAddress, uint8_t *data, uint8_t length);
 
 
 		//receive
