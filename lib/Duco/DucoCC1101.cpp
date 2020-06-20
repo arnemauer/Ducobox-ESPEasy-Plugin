@@ -740,7 +740,7 @@ void DucoCC1101::checkForAck(){
 
 bool DucoCC1101::matchingNetworkId(uint8_t id[4]) 
 {
-	for (uint8_t i=0; i<3;i++){
+	for (uint8_t i=0; i<=3;i++){
 		if (id[i] != this->networkId[i]){
 			return false;
 		}
