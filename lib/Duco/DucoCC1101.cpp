@@ -9,6 +9,16 @@
 #include <SPI.h>
 
 
+// TODO: 
+// - Hoe reageert een bedieningsschakelaar wanneer er een networkcall is voor zijn network address?
+// bijvoorbeeld gw address = 5
+// Received message: SRC:1; DEST:0; ORG.SRC:1; ORG.DEST:0; Ntwrk:0001f947;Type:0; Bytes:10; Counter:12; RSSI:-68 (0x0D);
+// DATA: FF,05,  <<<< 
+
+
+
+
+
 // default constructor
 DucoCC1101::DucoCC1101(uint8_t counter, uint8_t sendTries) : CC1101()
 {
@@ -669,6 +679,8 @@ bool DucoCC1101::joinPacketValidNetworkId(){
 	return false;
 }
 
+
+
 void DucoCC1101::processJoin4Packet(){
 	// A join4 message is send to the networkID of the Ducobox (networkID is set by a join2 message). Check for matching network ID
 	if(matchingNetworkId(inDucoPacket.networkId)){
@@ -681,7 +693,6 @@ void DucoCC1101::processJoin4Packet(){
 			setLogMessage(F("processJoin4Packet: invalid join4 packet received, not our network ID."));
 	}
 }
-
 
 
 // data of a join4 message: 00 00 7C 3E XX YY
@@ -1292,12 +1303,27 @@ void DucoCC1101::sendTestMessage(){
 	return;
 }
 
-/*
-DucoPacket* DucoCC1101::TEST_getTestMessage(){
-	if(!matchingNetworkId(inDucoPacket.networkId)){ // check for network id
-		// reset dataLength
-		inDucoPacket.dataLength = 0;
+
+void DucoCC1101::sendRawPacket(uint8_t messageType, uint8_t sourceAddress, uint8_t destinationAddress, uint8_t originalSourceAddress, uint8_t originalDestinationAddress, uint8_t *data, uint8_t length){
+	
+	outDucoPacket.sourceAddress =  sourceAddress;
+	outDucoPacket.destinationAddress = destinationAddress;
+	outDucoPacket.originalSourceAddress =  originalSourceAddress;
+	outDucoPacket.originalDestinationAddress = originalDestinationAddress;
+	outDucoPacket.messageType = messageType;
+	outDucoPacket.commandLength = 0;
+
+	for(uint8_t i=0; i < length;i++){
+		outDucoPacket.data[i] = data[i];
 	}
-	return inDucoPacket;
+
+	outDucoPacket.dataLength = length;
+
+	memcpy(outDucoPacket.networkId,this->networkId,4);
+	outDucoPacket.counter = inDucoPacket.counter;
+
+	ducoToCC1101Packet(&outDucoPacket, &outMessage);
+
+	sendDataToDuco(&outMessage);
+	setLogMessage(F("Send raw Duco packet done!"));
 }
-*/
