@@ -406,21 +406,19 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 						String param6 = parseString(tmpString, 7); 
 						char hexValues[40];
 						param6.toCharArray(hexValues, 40);
-
-						unsigned char hexArray[20];
+						
+						uint8_t hexArraySize = 20;
+						unsigned char hexArray[hexArraySize];
 						uint8_t dataBytes = 0;
-						PLUGIN_150_hexstringToHex(hexValues, hexArray, &dataBytes);
+						PLUGIN_150_hexstringToHex(hexValues, strlen(hexValues), hexArray, hexArraySize, &dataBytes);
+
+						addLog(LOG_LEVEL_INFO, PLUGIN_LOG_PREFIX_150 + dataBytes);
 
 						uint8_t* myuint8array = (uint8_t*)hexArray;
 						PLUGIN_150_rf.sendRawPacket(messageType, sourceAddress, destinationAddress, originalSourceAddress, originalDestinationAddress, myuint8array, dataBytes);
 
-							String log6 = PLUGIN_LOG_PREFIX_150 + F("Sent DUCOTESTMESSAGE to Duco Network: ");
-							log6 += messageType + ",";
-							log6 += sourceAddress + ",";
-							log6 += destinationAddress + ",";
-							log6 += originalSourceAddress + ",";
-							log6 += originalDestinationAddress + ",";
-							log6 += "bytes:";
+							String log6 = PLUGIN_LOG_PREFIX_150 + F("Sent DUCOTESTMESSAGE to Duco Network. ");
+							log6 += "Databytes: ";
 							log6 += dataBytes;
 
 							addLog(LOG_LEVEL_INFO, log6);
@@ -641,14 +639,16 @@ void PLUGIN_150_Publishdata(struct EventStruct *event) {
 
 
 
-void PLUGIN_150_hexstringToHex(char *hexString, unsigned char *hexArray, uint8_t *length ){
+void PLUGIN_150_hexstringToHex(char *hexString, uint8_t hexStringSize, unsigned char *hexArray, uint8_t hexArraySize, uint8_t *dataBytes ){
 	 const char *pos = hexString;
 
+
      /* WARNING: no sanitization or error-checking whatsoever */
-    for (size_t count = 0; count < sizeof hexArray/sizeof *hexArray; count++) {
+    for (size_t count = 0; count < min(hexStringSize/2, (int)hexArraySize); count++) {
         sscanf(pos, "%2hhx", &hexArray[count]);
         pos += 2;
-		  length++;
+		  (*dataBytes)++; 
+		  addLog(LOG_LEVEL_INFO, PLUGIN_LOG_PREFIX_150 + F("COUNT") + count);
     }
 
 }
