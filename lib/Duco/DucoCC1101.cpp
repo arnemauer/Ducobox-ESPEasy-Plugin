@@ -38,6 +38,7 @@ DucoCC1101::DucoCC1101(uint8_t counter, uint8_t sendTries) : CC1101()
 	this->numberOfLogmessages = 0;
 
 	this->installerModeActive = false;
+	this->temperature = 0;
 
 } //DucoCC1101
 
@@ -836,13 +837,11 @@ void DucoCC1101::parseMessageCommand()
 		if( (inDucoPacket.data[2] == 0x00) && (inDucoPacket.data[3] == 0x12)){
 			setLogMessage(F("Received change ventilation command"));
 
-			if((inDucoPacket.data[4] < 30)){ //CHECK IF ventilationmode has a valid value
-				currentVentilationMode = inDucoPacket.data[4];
+			processNewVentilationMode();
 
-				//  Bevestiging van wijziging  ventilatiestand (door node)	0x40 0x00 0x22
-				sendConfirmationNewVentilationMode();
-				waitForAck();
-			}
+			//  Bevestiging van wijziging  ventilatiestand (door node)	0x40 0x00 0x22
+			sendConfirmationNewVentilationMode();
+			waitForAck();
 		}
 		break;
 
@@ -904,32 +903,6 @@ void DucoCC1101::repeatMessage(){
 
 
 
-
-
-void DucoCC1101::sendConfirmationNewVentilationMode(){
-//40	0	22 +	ventilationmode +	0c	79
-	uint8_t parameter = inDucoPacket.data[4];
-
-	outDucoPacket.command[0] = 0x40;
-	outDucoPacket.command[1] = 0x00;
-	outDucoPacket.command[2] = 0x22;
-	outDucoPacket.command[3] = 0x00;
-	
-	outDucoPacket.commandLength = 4;
-	outDucoPacket.data[0] = parameter;
-	outDucoPacket.data[1] = 0x6d;
-	//outDucoPacket.data[2] = 0x79;
-	outDucoPacket.dataLength = 2;
-	
-	outDucoPacket.messageType = ducomsg_message;
-
-  	prefillDucoPacket(&outDucoPacket, inDucoPacket.sourceAddress, inDucoPacket.originalDestinationAddress, inDucoPacket.originalSourceAddress); 
-	outDucoPacket.counter = updateMessageCounter();
-	ducoToCC1101Packet(&outDucoPacket, &outMessage);
-
-	sendDataToDuco(&outMessage);
-	setLogMessage(F("SEND sendConfirmationNewVentilationMode done!"));
-}
 
 
 
@@ -1185,22 +1158,49 @@ void DucoCC1101::ducoToCC1101Packet(DucoPacket *duco, CC1101Packet *packet)
 	}
 
 	packet->length = 10 + duco->commandLength + duco->dataLength;
-
-
-
-
 }
 
 
 
-void DucoCC1101::requestVentilationMode(uint8_t ventilationMode, uint8_t percentage, uint8_t temp){
-	requestVentilationMode(ventilationMode, percentage, temp, false);
+// Command from DUCOBOX to node to change ventilationmode: 0x20 0x00 0x12
+// Byte 4:
+//				bit 0-3: 0000 (always 0000)
+//				bit 4  : PERMANENTE STAND (1) of tijdelijk (0) in combinatie met bit 5-7
+//				bit 5-7: 000 (0) = auto, 100 (4) = LOW, 101 (5) = MIDDLE, 110 (6) = HIGH, 111 (7) = not home
+//
+void DucoCC1101::processNewVentilationMode(){
+	// check for valid ventilationmode (0-4)
+	if( (inDucoPacket.data[4] & 0b00000111) <= 7){
+		this->currentVentilationMode = (inDucoPacket.data[4] & 0b00000111);
+		this->permanentVentilationMode = (inDucoPacket.data[4] & 0b00001000);
+	}
 }
 
-void DucoCC1101::requestVentilationMode(uint8_t ventilationMode, uint8_t percentage, uint8_t temp, bool activateInstallerMode){
-	//setLogMessage("requestVentilationMode()");
 
+
+void DucoCC1101::requestVentilationMode(uint8_t ventilationMode, bool setPermanentVentilationMode, uint8_t percentage){
+	if(ventilationMode <= 7){
+		// TODO: store percentage in memory till ventilationmode changes?
+		sendVentilationModeMessage(setPermanentVentilationMode, true, ventilationMode, percentage, this->temperature, false);
+	}else{
+			setLogMessage(F("Invalid ventilationmode requested."));
+	}
+}
+
+
+// Command change ventilationMode: 0x40 0x00 0x22
+// Byte 3: Sensor request percentage  (0-100%)
+// Byte 4:
+//				bit 0-1: 00 (always 00)
+//				bit 2  : PERMANENTE STAND (1) of tijdelijk (0) in combinatie met bit 5-7
+//				bit 3  : installation mode on (1) 
+//				bit 4  : Ventilatiestand instellen (1) of bevestigen (0)
+//				bit 5-7: 000 (0) = auto, 100 (4) = LOW, 101 (5) = MIDDLE, 110 (6) = HIGH
+//
+void DucoCC1101::sendVentilationModeMessage(bool setPermanent, bool setVentilationMode, uint8_t ventilationMode, uint8_t percentage, uint8_t temp, bool activateInstallerMode){
+	uint8_t permanentModeBit = setPermanent ? 0x20 : 0x00; // 0x20 = 0010.0000
 	uint8_t installerModeBit = activateInstallerMode ? 0x10 : 0x00; // 0x10 = 0001.0000
+	uint8_t setVentilationModeBit = setVentilationMode ? 0x08 : 0x00; // 0x08 = 0000.1000
 
 	outDucoPacket.messageType = ducomsg_message;
 
@@ -1209,11 +1209,10 @@ void DucoCC1101::requestVentilationMode(uint8_t ventilationMode, uint8_t percent
 	outDucoPacket.command[2] = 0x22;
 	outDucoPacket.commandLength = 3;
 	outDucoPacket.data[0] = percentage;
-	outDucoPacket.data[1] = (installerModeBit | 0x08 | ventilationMode); // 0x08 = 0000.1000
-	outDucoPacket.data[2] = (temp -100); // temp = 21.0c = 21 - 10 = 11 (dec) = 0x0B
+	outDucoPacket.data[1] = (permanentModeBit | installerModeBit | setVentilationModeBit | ventilationMode); // 0x08 = 0000.1000
+	outDucoPacket.data[2] = (temp -100); // temp = 21.0c = 210 - 100 = 110 (dec) = 0x6E
 	outDucoPacket.dataLength = 3;
  
- //prefillDucoPacket(DucoPacket *ducoOutPacket, uint8_t destinationAddress, uint8_t originalSourceAddress, uint8_t originalDestinationAddress 
 	prefillDucoPacket(&outDucoPacket, 0x01); // address duco
 
 	outDucoPacket.counter = updateMessageCounter();
@@ -1221,23 +1220,38 @@ void DucoCC1101::requestVentilationMode(uint8_t ventilationMode, uint8_t percent
 
 	sendDataToDuco(&outMessage);
 
-	char logBuf[120];
-	snprintf(logBuf, sizeof(logBuf), "Send requestventilationmode done. mode: %u, override percentage: %u%%, temp: %u C, installermode: %u", ventilationMode, percentage, temp, activateInstallerMode);
+	char logBuf[130];
+	snprintf(logBuf, sizeof(logBuf), "Send requestventilationmode done. mode: %u, permanent %u override percentage: %u%%, temp: %u C, installermode: %u", ventilationMode, permanentModeBit, percentage, temp, activateInstallerMode);
 	setLogMessage(logBuf);
 
 	waitForAck();
-
-	// change current ventilation mode => DONT, just wait for confirmation message!
-	//currentVentilationMode = ventilationMode; 
-return;
+	return;
 }
 
 
+void DucoCC1101::sendConfirmationNewVentilationMode(){
+	// is overrule percentage always 0 when confirming a ventilationmode change?
+	sendVentilationModeMessage(this->permanentVentilationMode, false, this->currentVentilationMode, 0, this->temperature, false);
+	setLogMessage(F("Send sendConfirmationNewVentilationMode done!"));
+}
 
+
+void DucoCC1101::setTemperature(int newTemperature) {  
+	if(newTemperature >= 100 && newTemperature <= 355){
+		this->temperature = (newTemperature - 100); 
+	}else{
+		setLogMessage(F("Can't set temperature because temperature isnt in accepted range (100 - 355)."));
+	}
+}
+
+
+void DucoCC1101::enableInstallerMode(){
+	sendVentilationModeMessage(this->permanentVentilationMode, false, this->currentVentilationMode, 0, this->temperature, true);
+	setLogMessage(F("Send enableInstallerMode done!"));
+}
 
 
 void DucoCC1101::disableInstallerMode(){
-	//setLogMessage("disableInstallerMode()");
 	outDucoPacket.messageType = ducomsg_network;
 
 	outDucoPacket.commandLength = 0;
@@ -1245,9 +1259,6 @@ void DucoCC1101::disableInstallerMode(){
 	outDucoPacket.dataLength = 1;
  
 	prefillDucoPacket(&outDucoPacket, 0x01); // address duco
-
-	// increase counter!
-	// function like getCounter()???
 	outDucoPacket.counter = updateMessageCounter();
 	ducoToCC1101Packet(&outDucoPacket, &outMessage);
 
@@ -1255,7 +1266,6 @@ void DucoCC1101::disableInstallerMode(){
 	setLogMessage(F("SEND disableInstallerMode done!"));
 
 	waitForAck();
-
 }
 
 
@@ -1327,3 +1337,5 @@ void DucoCC1101::sendRawPacket(uint8_t messageType, uint8_t sourceAddress, uint8
 	sendDataToDuco(&outMessage);
 	setLogMessage(F("Send raw Duco packet done!"));
 }
+
+

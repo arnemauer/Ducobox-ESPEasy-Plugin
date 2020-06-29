@@ -78,7 +78,16 @@ class DucoCC1101 : protected CC1101
 		uint8_t pingCounter;
 
 		uint8_t messageCounter;
+
+		// keeps the current ventilationmode values
 		uint8_t currentVentilationMode;
+		bool permanentVentilationMode;
+		uint8_t overrulePercentage;
+		uint8_t temperature;
+
+
+
+
 
 		bool waitingForAck; 
 		uint8_t counterInAck;
@@ -134,7 +143,13 @@ class DucoCC1101 : protected CC1101
 		uint8_t getLastCounter() { return outDucoPacket.counter; }				//counter is increased before sending a command
 		void setSendTries(uint8_t sendTries) { this->sendTries = sendTries; }
 		
+		void setTemperature(int temperature); // set temperature in degrees celsius x 10. 21.5 C = int (215)
+		
+		
 		uint8_t getCurrentVentilationMode() { return this->currentVentilationMode; }						//retrieve last received/parsed command from remote	
+		bool getCurrentPermanentMode() { return this->permanentVentilationMode; }						//retrieve last received/parsed command from remote	
+		
+		
 		uint8_t getDucoDeviceState() { return this->ducoDeviceState; } // retrieve radio/duco state
 		
 		// 
@@ -176,10 +191,12 @@ class DucoCC1101 : protected CC1101
 		bool checkForNewPacketInRXFifo();
 		uint8_t checkForBytesInRXFifo();
 
-		void requestVentilationMode(uint8_t ventilationMode, uint8_t percentage, uint8_t temp);
-		void requestVentilationMode(uint8_t ventilationMode, uint8_t percentage, uint8_t temp, bool activateInstallerMode);
+		void requestVentilationMode(uint8_t ventilationMode, bool setPermanentVentilationMode, uint8_t percentage);	
+		void sendVentilationModeMessage(bool setPermanent, bool setVentilationMode, uint8_t ventilationMode, uint8_t percentage, uint8_t temp, bool activateInstallerMode);
 
+		void enableInstallerMode();
 		void disableInstallerMode();
+		
 		bool getInstallerModeActive(){ return installerModeActive; }
 
 		DucoPacket getLastPacket() { return inDucoPacket; }						//retrieve last received/parsed packet from remote
@@ -236,6 +253,8 @@ class DucoCC1101 : protected CC1101
 		void parseMessageCommand();
 				
 		void repeatMessage();
+
+		void processNewVentilationMode();
 
 
 		void sendPing();

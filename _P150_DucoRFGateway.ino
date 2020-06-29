@@ -143,6 +143,7 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 				PLUGIN_150_rf.setDeviceAddress(PCONFIG(P150_CONFIG_DEVICE_ADDRESS));
 				PLUGIN_150_rf.setNetworkId(PLUGIN_150_ExtraSettings.networkId);
 				PLUGIN_150_rf.setRadioPower(P150_radio_power_value[PCONFIG(P150_CONFIG_RADIO_POWER)]);
+				PLUGIN_150_rf.setTemperature(210); // = 21.0 C
 								
 				String log4 = PLUGIN_LOG_PREFIX_150 + "Values set from config. DeviceID: ";
 				log4 += PLUGIN_150_rf.getDeviceAddress();
@@ -295,14 +296,15 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 						uint8_t percentage = atoi(param2.c_str()); // if empty percentage will be 0
 
 						uint8_t ventilationMode = 0x99;
-						if (param1.equalsIgnoreCase(F("AUTO")))	{ 		  	ventilationMode = 0x00;
-						}else if (param1.equalsIgnoreCase(F("HIGH10")))	{ 	ventilationMode = 0x01;
-						}else if (param1.equalsIgnoreCase(F("HIGH20")))	{ 	ventilationMode = 0x02;
-						}else if (param1.equalsIgnoreCase(F("HIGH30")))	{ 	ventilationMode = 0x03;
-						}else if (param1.equalsIgnoreCase(F("LOW")))	{ 		ventilationMode = 0x04;
-						}else if (param1.equalsIgnoreCase(F("MIDDLE")))	{ 	ventilationMode = 0x05;
-						}else if (param1.equalsIgnoreCase(F("HIGH")))	{ 	ventilationMode = 0x06;
-						}else if (param1.equalsIgnoreCase(F("NOTHOME"))){ 	ventilationMode = 0x07; 
+						bool permanentVentilationMode = false;
+						if (param1.equalsIgnoreCase(F("AUTO")))	{ 		  				ventilationMode = 0x00;
+						}else if (param1.equalsIgnoreCase(F("LOW")))	{ 					ventilationMode = 0x04;
+						}else if (param1.equalsIgnoreCase(F("MIDDLE")))	{ 				ventilationMode = 0x05;
+						}else if (param1.equalsIgnoreCase(F("HIGH")))	{ 				ventilationMode = 0x06;					
+						}else if (param1.equalsIgnoreCase(F("NOTHOME"))){ 				ventilationMode = 0x07; 
+						}else if (param1.equalsIgnoreCase(F("PERMANENTLOW")))	{ 		ventilationMode = 0x04; permanentVentilationMode = true;
+						}else if (param1.equalsIgnoreCase(F("PERMANENTMIDDLE")))	{ 	ventilationMode = 0x05; permanentVentilationMode = true;
+						}else if (param1.equalsIgnoreCase(F("PERMANENTHIGH")))	{ 	ventilationMode = 0x06; permanentVentilationMode = true;
 						}
 
 						if(ventilationMode == 0x99){
@@ -313,7 +315,7 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 							addLog(LOG_LEVEL_INFO, log5);
 							printWebString += log5;
 
-							PLUGIN_150_rf.requestVentilationMode(ventilationMode,percentage,0xD2); // temp=210 = 21.0C	
+							PLUGIN_150_rf.requestVentilationMode(ventilationMode, permanentVentilationMode, percentage);
 						}
 
 						success = true;
@@ -367,7 +369,7 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 							success = true;
 						}else if(param1.equalsIgnoreCase(F("ON"))){
 							uint8_t ventilationState = PLUGIN_150_rf.getCurrentVentilationMode();
-							PLUGIN_150_rf.requestVentilationMode(ventilationState, 0x00, 0xD2, true); // temp=210 = 21.0C
+							PLUGIN_150_rf.enableInstallerMode();
 							addLog(LOG_LEVEL_INFO, PLUGIN_LOG_PREFIX_150 + F("Sent command for enabling installermode."));
 							printWebString += PLUGIN_LOG_PREFIX_150 + F("Sent command for enabling installermode.");
 							success = true;
@@ -447,13 +449,10 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 					case 3:  {  ventMode = "ManualMode3 (3)"; break; } // modbus 6 = Manuele hoogstand      convert to duco 3  = "man3" = ManualMode3; 
 					case 4:  {  ventMode = "EmptyHouse (4)"; break; } // modbus 7 = Niet-thuis-stand       convert to duco 4  = "empt" = EmptyHouse;
 
-					case 12:  {  ventMode = "PermanentManualMode1 (12)"; break; } // 	= continu LOW		       convert to duco 4  = "cnt1" = PermanentManualMode1;
-					case 13:  {  ventMode = "PermanentManualMode2 (13)"; break; } //   = continu MIDDLE       convert to duco 4  = "cnt2" = PermanentManualMode2;
-					case 14:  {  ventMode = "PermanentManualMode3 (14)"; break; } //   = continu HIGH       convert to duco 4  = "cnt3" = PermanentManualMode3;
+					case 11:  {  ventMode = "PermanentManualMode1 (11)"; break; } // 	= continu LOW		       convert to duco 4  = "cnt1" = PermanentManualMode1;
+					case 12:  {  ventMode = "PermanentManualMode2 (12)"; break; } //   = continu MIDDLE       convert to duco 4  = "cnt2" = PermanentManualMode2;
+					case 13:  {  ventMode = "PermanentManualMode3 (13)"; break; } //   = continu HIGH       convert to duco 4  = "cnt3" = PermanentManualMode3;
 
-					case 21: {  ventMode = "Boost10min (21)"; break; } // modbus 1 = 10 minuten hoogstand   convert to duco 21 = "aut1" = Boost10min;
-					case 22: {  ventMode = "Boost20min (22)"; break; } // modbus 2 = 20 minuten hoogstand   convert to duco 22 = "aut2" = Boost20min;
-					case 23: {  ventMode = "Boost30min (23)"; break; } // modbus 3 = 30 minuten hoogstand   convert to duco 23 = "aut3" = Boost30min;
 					default: {  ventMode = "NA"; break; };
 				}
 			}else{
@@ -491,6 +490,13 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 					addHtml(F("<div class=\"div_r\" style=\"background-color: #07D;\"><a style='color:#fff; text-decoration: none;' href='/tools?cmd=VENTMODE,LOW'>LOW</a></div>"));
 					addHtml(F("<div class=\"div_r\" style=\"background-color: #07D;\"><a style='color:#fff; text-decoration: none;' href='/tools?cmd=VENTMODE,MIDDLE'>MID</a></div>"));
 					addHtml(F("<div class=\"div_r\" style=\"background-color: #07D;\"><a style='color:#fff; text-decoration: none;' href='/tools?cmd=VENTMODE,HIGH'>HIGH</a></div>"));
+					
+					addHtml(F("<div class=\"div_br\"></div>"));
+
+					addHtml(F("<div class=\"div_r\" style=\"background-color: #07D;\"><a style='color:#fff; text-decoration: none;' href='/tools?cmd=VENTMODE,PERMANENTLOW'>Perm. LOW</a></div>"));
+					addHtml(F("<div class=\"div_r\" style=\"background-color: #07D;\"><a style='color:#fff; text-decoration: none;' href='/tools?cmd=VENTMODE,PERMANENTMIDDLE'>Perm. MID</a></div>"));
+					addHtml(F("<div class=\"div_r\" style=\"background-color: #07D;\"><a style='color:#fff; text-decoration: none;' href='/tools?cmd=VENTMODE,PERMANENTHIGH'>Perm. HIGH</a></div>"));
+				
 				}
 				addHtml(F("<div class=\"div_br\"></div>"));
 			}
@@ -599,24 +605,27 @@ void PLUGIN_150_DUCOcheck() {
 	}
 
 		int ventilationState = PLUGIN_150_rf.getCurrentVentilationMode();
+		bool permanentMode = PLUGIN_150_rf.getCurrentPermanentMode();
 
       //  convert modbus status to "normal" duco status numbers
-      switch(ventilationState){
-         case 0: { PLUGIN_150_State = 0; break; } // modbus 0 = auto                   convert to duco 0  = "auto" = AutomaticMode;
-         case 1: { PLUGIN_150_State = 21; break; } // modbus 1 = 10 minuten hoogstand   convert to duco 21 = "aut1" = Boost10min;
-         case 2: { PLUGIN_150_State = 22; break; } // modbus 2 = 20 minuten hoogstand   convert to duco 22 = "aut2" = Boost20min;
-         case 3: { PLUGIN_150_State = 23; break; } // modbus 3 = 30 minuten hoogstand   convert to duco 23 = "aut3" = Boost30min;
-         case 4: { PLUGIN_150_State = 1; break; } // modbus 4 = Manuele laagstand      convert to duco 1  = "man1" = ManualMode1;
-         case 5: { PLUGIN_150_State = 2; break; } // modbus 5 = Manuele middenstand    convert to duco 2  = "man2" = ManualMode2; 
-         case 6: { PLUGIN_150_State = 3; break; } // modbus 6 = Manuele hoogstand      convert to duco 3  = "man3" = ManualMode3; 
-         case 7: { PLUGIN_150_State = 4; break; } // modbus 7 = Niet-thuis-stand       convert to duco 4  = "empt" = EmptyHouse;
-			case 12:  {  PLUGIN_150_State = 12; break; } // 	= continu LOW		       convert to duco 4  = "cnt1" = PermanentManualMode1;
-			case 13:  {  PLUGIN_150_State = 13; break; } //   = continu MIDDLE       convert to duco 4  = "cnt2" = PermanentManualMode2;
-			case 14:  {  PLUGIN_150_State = 14; break; } //   = continu HIGH       convert to duco 4  = "cnt3" = PermanentManualMode3;
+		if(!permanentMode){
+			switch(ventilationState){
+				case 0: { PLUGIN_150_State = 0; break; } // modbus 0 	= auto                   convert to duco 0  = "auto" = AutomaticMode;
+				case 4: { PLUGIN_150_State = 1; break; } // modbus 4 	= Manuele laagstand      convert to duco 1  = "man1" = ManualMode1;
+				case 5: { PLUGIN_150_State = 2; break; } // modbus 5 	= Manuele middenstand    convert to duco 2  = "man2" = ManualMode2; 
+				case 6: { PLUGIN_150_State = 3; break; } // modbus 6 	= Manuele hoogstand      convert to duco 3  = "man3" = ManualMode3; 
+				case 7: { PLUGIN_150_State = 4; break; } // modbus 7 	= Niet-thuis-stand       convert to duco 4  = "empt" = EmptyHouse;
+				default: { 	addLog(LOG_LEVEL_DEBUG,PLUGIN_LOG_PREFIX_150 + F("Unknown ventilationmode")); }
+			}
+		}else{
+			switch(ventilationState){
+				case 4:  {  PLUGIN_150_State = 11; break; } // 	  		= continu LOW		     	convert to duco 11  = "cnt1" = PermanentManualMode1;
+				case 5:  {  PLUGIN_150_State = 12; break; } //   	  	= continu MIDDLE       	convert to duco 12  = "cnt2" = PermanentManualMode2;
+				case 6:  {  PLUGIN_150_State = 13; break; } //      	= continu HIGH       	convert to duco 13  = "cnt3" = PermanentManualMode3;
+				default: { 	addLog(LOG_LEVEL_DEBUG,PLUGIN_LOG_PREFIX_150 + F("Unknown ventilationmode")); }
+			}
+		}
 
-      }
-
-	//interrupts();
 	}else{
 		// CC1101 automaticly discards packets when CRC isn't OK.
 		addLog(LOG_LEVEL_DEBUG,PLUGIN_LOG_PREFIX_150 + F("Ignoring RF noise"));
