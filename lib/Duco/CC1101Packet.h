@@ -19,8 +19,9 @@ class CC1101Packet
 {
 	public:
 		uint8_t length;
-		uint8_t data[72];
-				/**
+		uint8_t data[32]; 	// The CC1101 is configured with a maximum packet size of 32 bytes (PKTLEN register)
+							//The packet length is defined as the payload data, excluding the length byte and the optional CRC.
+		/**
      	* CRC OK flag
      	*/
     	bool crc_ok;

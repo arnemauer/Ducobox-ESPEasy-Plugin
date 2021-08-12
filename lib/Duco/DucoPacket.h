@@ -22,7 +22,8 @@ class DucoPacket
 		uint8_t command[4];
 		uint8_t commandLength;
 
-		uint8_t data[40];
+		uint8_t data[23]; // max packet is 32 bytes (- 9 bytes for addressing) = 23 bytes for data
+
 		uint8_t dataLength;
 		
 		uint8_t counter;		//0-255, counter is increased on every remote button press
