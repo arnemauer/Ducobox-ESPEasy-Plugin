@@ -1143,7 +1143,7 @@ void DucoCC1101::ducoToCC1101Packet(DucoPacket *duco, CC1101Packet *packet)
 
 	//address
 	packet->data[6] = (duco->sourceAddress << 3) | (duco->destinationAddress >> 2);
-	packet->data[7] = (duco->destinationAddress << 6) | (duco->sourceAddress << 1) | (duco->originalDestinationAddress >> 4);
+	packet->data[7] = (duco->destinationAddress << 6) | (duco->originalSourceAddress << 1) | (duco->originalDestinationAddress >> 4);
 	packet->data[8] = (duco->originalDestinationAddress << 4) | duco->counter;
 
 	// footer
