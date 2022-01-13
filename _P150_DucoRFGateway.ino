@@ -117,6 +117,10 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
   		
 		case PLUGIN_INIT: {
 		
+			LoadCustomTaskSettings(event->TaskIndex, (byte*)&PLUGIN_150_ExtraSettings, sizeof(PLUGIN_150_ExtraSettings));
+			addLog(LOG_LEVEL_INFO, PLUGIN_LOG_PREFIX_150 + F("Extra Settings PLUGIN_150 loaded"));
+						
+						
 			// check if task is enable and IRQ pin is set, if not than reset CC1101
 			if (Settings.TaskDeviceEnabled[event->TaskIndex] == false || Settings.TaskDevicePin1[event->TaskIndex] == -1) {
 				addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_150 + F("Task disabled, checking if CC1101 needs a reset."));
@@ -133,11 +137,7 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 					addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_150 + F("IO-PIN changed, deatachinterrupt old pin"));
 					detachInterrupt(Plugin_150_IRQ_pin);
 				}
-
-			
-				LoadCustomTaskSettings(event->TaskIndex, (byte*)&PLUGIN_150_ExtraSettings, sizeof(PLUGIN_150_ExtraSettings));
-				addLog(LOG_LEVEL_INFO, PLUGIN_LOG_PREFIX_150 + F("Extra Settings PLUGIN_150 loaded"));
-								
+				
 				PLUGIN_150_rf.setLogRFMessages(PCONFIG(P150_CONFIG_LOG_RF));
 				PLUGIN_150_rf.init();
 				PLUGIN_150_rf.setDeviceAddress(PCONFIG(P150_CONFIG_DEVICE_ADDRESS));
