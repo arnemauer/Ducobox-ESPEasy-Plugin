@@ -56,7 +56,7 @@ boolean Plugin_154(byte function, struct EventStruct *event, String& string){
       case PLUGIN_DEVICE_ADD:{
          Device[++deviceCount].Number = PLUGIN_ID_154;
          Device[deviceCount].Type = DEVICE_TYPE_DUMMY;
-         Device[deviceCount].VType = SENSOR_TYPE_SINGLE;
+         Device[deviceCount].VType = Sensor_VType::SENSOR_TYPE_SINGLE;
          Device[deviceCount].Ports = 0;
          Device[deviceCount].PullUpOption = false;
          Device[deviceCount].InverseLogicOption = false;
@@ -255,10 +255,10 @@ void startReadExternalSensors(String logPrefix, uint8_t dataType, int nodeAddres
 		safe_strncpy(dataTypeName, "temp", sizeof(dataTypeName));
 		parameter = P154_DUCO_PARAMETER_TEMP;
 	}else if(dataType == DUCO_DATA_EXT_SENSOR_RH){ 
-		safe_strncpy(dataTypeName, "CO2", sizeof(dataTypeName));
+		safe_strncpy(dataTypeName, "RH", sizeof(dataTypeName));
 		parameter = P154_DUCO_PARAMETER_RH;
 	}else	if(dataType == DUCO_DATA_EXT_SENSOR_CO2_PPM){ 
-		safe_strncpy(dataTypeName, "RH", sizeof(dataTypeName));
+		safe_strncpy(dataTypeName, "CO2", sizeof(dataTypeName));
 		parameter = P154_DUCO_PARAMETER_CO2;
 	}else{ 
 		return;
@@ -289,15 +289,24 @@ void startReadExternalSensors(String logPrefix, uint8_t dataType, int nodeAddres
 }
 
                 /* Example output:
+                  // temperature
                    > nodeparaget 2 73
                     Get PARA 73 of NODE 2
                     --> 216
                     Done
                     
+                  // CO2
                   > nodeparaget 2 74
                     Get PARA 74 of NODE 2
                     --> 492
                     Done
+
+                  // relative humidity
+                  > nodeparaget 2 75
+                     Get PARA 75 of NODE 2
+                     --> 5334
+                     Done
+
                  */
 void readExternalSensorsProcessRow(String logPrefix, uint8_t userVarIndex, uint8_t dataType, int nodeAddress, bool serialLoggingEnabled){
     // get the first row to check for command, skip row 2 & 3, get row 4 (columnnames)
@@ -346,7 +355,7 @@ void readExternalSensorsProcessRow(String logPrefix, uint8_t userVarIndex, uint8
          }else if(dataType == DUCO_DATA_EXT_SENSOR_TEMP){
             float temp = (float) raw_value / 10.;
             UserVar[userVarIndex] = temp;
-            snprintf(logBuf, sizeof(logBuf), "TEMP: %u = %.1f°C", raw_value, temp);
+            snprintf(logBuf, sizeof(logBuf), "TEMP: %u = %.1fÂ°C", raw_value, temp);
 
          }else if(dataType == DUCO_DATA_EXT_SENSOR_RH){
             float rh = (float) raw_value / 100.;

@@ -1,3 +1,5 @@
+#include "_Plugin_Helper.h"
+
 //#################################### Plugin 151: DUCO Serial Gateway ##################################
 //
 //  DUCO Serial Gateway to read Ducobox data
@@ -13,11 +15,13 @@
 #define PLUGIN_READ_TIMEOUT_151 3000
 #define PLUGIN_LOG_PREFIX_151 String("[P151] DUCO SER GW: ")
 #define DUCOBOX_NODE_NUMBER 1
-#define PLUGIN_151_SERIALSWITCH_PIN 2
+#define PLUGIN_151_HARDWARE_83_AND_LOWER_SERIALSWITCH_PIN 2
+#define PLUGIN_151_PCF_ADDRESS 0x38 // 7-bit address!
 
 boolean Plugin_151_init = false;
 boolean ventilation_gateway_disable_serial = false;
-
+boolean ventilation_gateway_serial_status_led = false; // false = off, true=on; need this to prevent continues turning gpio off (or sending command to PCF) in PLUGIN_TEN_PER_SECOND
+ 
 
 // 0 -> "auto" = AutomaticMode;
 // 1 -> "man1" = ManualMode1;
@@ -43,6 +47,7 @@ typedef enum {
 	P151_CONFIG_VALUE_TYPE = 0,
 	P151_CONFIG_LOG_SERIAL = 1,
 	P151_CONFIG_USE_FOR_NETWORK_TOOL = 2,
+	P151_CONFIG_HARDWARE_TYPE = 3,
 } P151PluginConfigs; // max 8 values
 
 
@@ -53,6 +58,12 @@ typedef enum {
 	P151_VALUE_COUNTDOWN = 3,
 	P151_VALUE_NONE = 4,
 } P151Values;
+
+typedef enum {
+	P151_HARDWARE_DIY = 0,
+	P151_HARDWARE_83_AND_LOWER = 1,
+	P151_HARDWARE_84_AND_HIGHER = 2,
+} P151HardwareTypes;
 
 
 //global variables
@@ -65,9 +76,10 @@ bool P151_waitingForSerialPort = false;
 #define P151_NR_OUTPUT_VALUES 4 // how many values do we need to read from networklist.
 uint8_t varColumnNumbers[P151_NR_OUTPUT_VALUES]; // stores the columnNumbers
 
+uint8_t P151_PCF_pin_state = 0b00000001; // pin P0 needs to be high (input)
 
 
-#define P151_NR_OUTPUT_OPTIONS 5
+#define P151_VALUENAME_NR_OUTPUT_OPTIONS 5
 String Plugin_151_valuename(byte value_nr, bool displayString) {
 	switch (value_nr) {
 		case P151_VALUE_VENTMODE:  return displayString ? F("Ventilationmode") : F("stat");
@@ -81,6 +93,19 @@ String Plugin_151_valuename(byte value_nr, bool displayString) {
   	return "";
 }
 
+#define P151_HARDWARE_NR_OUTPUT_OPTIONS 3
+String Plugin_151_hardware_type(byte value_nr) {
+	switch (value_nr) {
+		case P151_HARDWARE_DIY:  return F("DIY esp8266 hardware");
+		case P151_HARDWARE_83_AND_LOWER:  return F("Ventilation gateway V8.3 and lower");
+		case P151_HARDWARE_84_AND_HIGHER: return F("Ventilation gateway V8.4 and higher");
+		default:
+      break;
+  	}
+  	return "";
+}
+
+
 
 boolean Plugin_151(byte function, struct EventStruct *event, String &string)
 {
@@ -91,7 +116,7 @@ boolean Plugin_151(byte function, struct EventStruct *event, String &string)
 	case PLUGIN_DEVICE_ADD:{
 		Device[++deviceCount].Number = PLUGIN_ID_151;
 		Device[deviceCount].Type = DEVICE_TYPE_SINGLE;
-		Device[deviceCount].VType = SENSOR_TYPE_SINGLE;
+		Device[deviceCount].VType = Sensor_VType::SENSOR_TYPE_SINGLE;
 		Device[deviceCount].Ports = 0;
 		Device[deviceCount].PullUpOption = false;
 		Device[deviceCount].InverseLogicOption = false;
@@ -124,10 +149,21 @@ boolean Plugin_151(byte function, struct EventStruct *event, String &string)
 	case PLUGIN_EXIT: {
 		if(PCONFIG(P151_CONFIG_VALUE_TYPE) == P151_VALUE_VENTMODE){
 			P151_mainPluginActivatedInTask = false;
-		}
 
+			if(PCONFIG(P151_CONFIG_HARDWARE_TYPE) == P151_HARDWARE_84_AND_HIGHER){
+				P151_PCF_set_pin_output(0, HIGH); // PCF8574; P0 serial_switch_button = HIGH (input);
+				P151_PCF_set_pin_output(1, HIGH); // PCF8574; P1 SER_SWITCH_CONNECT_DUCO =  HIGH  (disconnect uart ducobox)
+				P151_PCF_set_pin_output(2, HIGH); // PCF8574; P2 SER_SWITCH_SWAP_UART = HIGH (uart NOT swapped)
+				P151_PCF_set_pin_output(4, HIGH); // PCF8574; P4 LED_SERIAL_SWITCH_GREEN =  HIGH (led off)
+				P151_PCF_set_pin_output(5, HIGH); // PCF8574; P5 LED_GREEN 	= HIGH (Led off)
+				//P151_PCF_set_pin_output(6, HIGH); // PCF8574; P6 LED_YELLOW	= HIGH (Led off)
+				//P151_PCF_set_pin_output(7, HIGH); // PCF8574; P7 LED_BLUE		= HIGH (Led off)
+
+			}
+		}
+		
 		addLog(LOG_LEVEL_INFO, PLUGIN_LOG_PREFIX_151 + F("EXIT PLUGIN_151"));
-      clearPluginTaskData(event->TaskIndex); // clear plugin taskdata
+      	clearPluginTaskData(event->TaskIndex); // clear plugin taskdata
 		//ClearCustomTaskSettings(event->TaskIndex); // clear networkID settings
 		
 		success = true;
@@ -135,10 +171,21 @@ boolean Plugin_151(byte function, struct EventStruct *event, String &string)
 	}
 
 	case PLUGIN_WEBFORM_LOAD: {
+
+		addRowLabel(F("Hardware type"));
+		addSelector_Head(PCONFIG_LABEL(P151_CONFIG_HARDWARE_TYPE));
+
+		for (byte x = 0; x < P151_HARDWARE_NR_OUTPUT_OPTIONS; x++){
+			addSelector_Item(Plugin_151_hardware_type(x), x, PCONFIG(P151_CONFIG_HARDWARE_TYPE) == x, false, "");
+		}
+		addSelector_Foot();
+
+
+
 		addRowLabel(F("Output Value Type"));
 		addSelector_Head(PCONFIG_LABEL(P151_CONFIG_VALUE_TYPE));
 
-		for (byte x = 0; x < P151_NR_OUTPUT_OPTIONS; x++){
+		for (byte x = 0; x < P151_VALUENAME_NR_OUTPUT_OPTIONS; x++){
 			String name     = Plugin_151_valuename(x, true);
 			bool   disabled = false;
 
@@ -155,7 +202,11 @@ boolean Plugin_151(byte function, struct EventStruct *event, String &string)
 
 		if(PCONFIG(P151_CONFIG_VALUE_TYPE) == P151_VALUE_VENTMODE){
 			addFormCheckBox(F("Log serial messages to syslog"), F("Plugin151_log_serial"), PCONFIG(P151_CONFIG_LOG_SERIAL));
-			addFormCheckBox(F("Disable gateway serial to use gateway as usb-cable for network tool"), F("Plugin151_use_for_network_tool"), PCONFIG(P151_CONFIG_USE_FOR_NETWORK_TOOL));
+
+			// if hardware is ventilation gateway show option to use as usb-cable
+			if(PCONFIG(P151_CONFIG_HARDWARE_TYPE) != P151_HARDWARE_DIY){
+				addFormCheckBox(F("Disable gateway serial to use gateway as usb-cable for network tool"), F("Plugin151_use_for_network_tool"), PCONFIG(P151_CONFIG_USE_FOR_NETWORK_TOOL));
+			}
 		}
 
 		success = true;
@@ -170,7 +221,10 @@ boolean Plugin_151(byte function, struct EventStruct *event, String &string)
 
 	case PLUGIN_WEBFORM_SAVE:{
 		// Save output selector parameters.
+		// check sensorTypeHelper_saveOutputSelector function, what does this?! https://github.com/letscontrolit/ESPEasy/blob/f268d21763bf32eb1d2ed35aa68266b3eec2afe9/src/src/Helpers/_Plugin_SensorTypeHelper.cpp#L159
 		sensorTypeHelper_saveOutputSelector(event, P151_CONFIG_VALUE_TYPE, 0, Plugin_151_valuename(PCONFIG(P151_CONFIG_VALUE_TYPE), true));
+		PCONFIG(P151_CONFIG_HARDWARE_TYPE) = getFormItemInt(PCONFIG_LABEL(P151_CONFIG_HARDWARE_TYPE), 0);
+
 
 		if(PCONFIG(P151_CONFIG_VALUE_TYPE) == P151_VALUE_VENTMODE){
 			P151_mainPluginActivatedInTask = true;
@@ -179,8 +233,20 @@ boolean Plugin_151(byte function, struct EventStruct *event, String &string)
 		}
 
 		if(PCONFIG(P151_CONFIG_VALUE_TYPE) == P151_VALUE_VENTMODE){
-	   	PCONFIG(P151_CONFIG_LOG_SERIAL) = isFormItemChecked(F("Plugin151_log_serial")); 
-	   	PCONFIG(P151_CONFIG_USE_FOR_NETWORK_TOOL) = isFormItemChecked(F("Plugin151_use_for_network_tool")); 
+	  		PCONFIG(P151_CONFIG_LOG_SERIAL) = isFormItemChecked(F("Plugin151_log_serial")); 
+
+			// if hardware is ventilation gateway show option to use as usb-cable
+			if(PCONFIG(P151_CONFIG_HARDWARE_TYPE) != P151_HARDWARE_DIY){
+	   			PCONFIG(P151_CONFIG_USE_FOR_NETWORK_TOOL) = isFormItemChecked(F("Plugin151_use_for_network_tool")); 
+			}else{
+				PCONFIG(P151_CONFIG_USE_FOR_NETWORK_TOOL) = false; // if hardware is diy, set false.
+			}
+
+			if(PCONFIG(P151_CONFIG_HARDWARE_TYPE) == P151_HARDWARE_84_AND_HIGHER){
+				Settings.TaskDevicePin1[event->TaskIndex] = -1;
+			}
+
+
 		}
 
 	 	success = true;
@@ -190,53 +256,109 @@ boolean Plugin_151(byte function, struct EventStruct *event, String &string)
 	case PLUGIN_INIT: {
 		
 		// load tasksettings, if we dont call this function, PCONFIG (Settings.TaskDevicePluginConfig) will be 0.
-      LoadTaskSettings(event->TaskIndex);
+    	LoadTaskSettings(event->TaskIndex);
+
+		// only initiate serial if we are the task with main plugin activated.
+		if(PCONFIG(P151_CONFIG_VALUE_TYPE) == P151_VALUE_VENTMODE){
+			P151_mainPluginActivatedInTask = true;
+
+			// set status led
+			if (CONFIG_PIN1 != -1 && PCONFIG(P151_CONFIG_HARDWARE_TYPE) != P151_HARDWARE_84_AND_HIGHER){
+				pinMode(CONFIG_PIN1, OUTPUT);
+				digitalWrite(CONFIG_PIN1, HIGH);
+			}
+
+			// set a flag voor plugins P150, P151, P152, P153, P154, P155, P156 to stop using serial
+			ventilation_gateway_disable_serial = PCONFIG(P151_CONFIG_USE_FOR_NETWORK_TOOL);
 
 
-			// set pin to control TS3A5017DRD16-M high
-			pinMode(PLUGIN_151_SERIALSWITCH_PIN, OUTPUT); // gpio2 = D4
+			// if hardwaretype is ventilation gateway show option to use as usb-cable
+			if(PCONFIG(P151_CONFIG_HARDWARE_TYPE) == P151_HARDWARE_83_AND_LOWER){
+				// set pin to control TS3A5017DRD16-M high
+				pinMode(PLUGIN_151_HARDWARE_83_AND_LOWER_SERIALSWITCH_PIN, OUTPUT); // gpio2 = D4
 
-			// only initiate serial if we are the task with main plugin activated.
-			if(PCONFIG(P151_CONFIG_VALUE_TYPE) == P151_VALUE_VENTMODE){
-				P151_mainPluginActivatedInTask = true;
-
-				// set status led
-				if (CONFIG_PIN1 != -1){
-					pinMode(CONFIG_PIN1, OUTPUT);
-					digitalWrite(CONFIG_PIN1, HIGH);
+				if(PCONFIG(P151_CONFIG_USE_FOR_NETWORK_TOOL)) {
+					Serial.end();  // stop serial
+					//put pins in input mode (High impedance) to prevent interference
+					pinMode(1, INPUT); // TX
+					pinMode(3, INPUT); // RX0
+					digitalWrite(PLUGIN_151_HARDWARE_83_AND_LOWER_SERIALSWITCH_PIN, LOW); // TS3A5017DRD16-M > LOW = TX/RX of PC usb-serial connected to ducobox
+				}else{
+					digitalWrite(PLUGIN_151_HARDWARE_83_AND_LOWER_SERIALSWITCH_PIN, HIGH); // TS3A5017DRD16-M > high =  PC usb-serial connected to gateway
+					// reset pinmode of RX and TX to default
+					pinMode(1, FUNCTION_0); // TX
+					pinMode(3, FUNCTION_0); // RX0
+					Serial.begin(115200, SERIAL_8N1);
 				}
-			
+			}else if(PCONFIG(P151_CONFIG_HARDWARE_TYPE) == P151_HARDWARE_84_AND_HIGHER){
+				addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_151 + F("P151_HARDWARE_84_AND_HIGHER"));
+
+				// >>>>> SET PCF8574 SET pin P1 HIGH = all switches are high impedance
+				// PCF8574 SET P1 LOW	
+				//P151_PCF_pin_state = 0xF7; // 0xF7 = 0b1111.0111; P0 serial_switch_button = HIGH (input); P1 SER_SWITCH_CONNECT_DUCO = HIGH (default duco uart not connected); P2 SER_SWITCH_SWAP_UART = HIGH (uart NOT swapped)
+				//Plugin_151_PCF8574_setReg(PLUGIN_151_PCF_ADDRESS, P151_PCF_pin_state);
+
+				P151_PCF_set_pin_output(0, HIGH); // PCF8574; P0 serial_switch_button = HIGH (input);
+				P151_PCF_set_pin_output(1, HIGH); // PCF8574; P1 SER_SWITCH_CONNECT_DUCO =  HIGH  (disconnect uart ducobox)
+				P151_PCF_set_pin_output(2, HIGH); // PCF8574; P2 SER_SWITCH_SWAP_UART = HIGH (uart NOT swapped)
+				P151_PCF_set_pin_output(4, HIGH); // PCF8574; P4 LED_SERIAL_SWITCH_GREEN =  HIGH (led off)
+				P151_PCF_set_pin_output(5, HIGH); // PCF8574; P5 LED_GREEN 	= HIGH (Led off)
+				//P151_PCF_set_pin_output(6, HIGH); // PCF8574; P6 LED_YELLOW	= HIGH (Led off)
+				//P151_PCF_set_pin_output(7, HIGH); // PCF8574; P7 LED_BLUE		= HIGH (Led off)
+
+				//!!!!!!!!!!!! TOODOO: gaan we dit switchen elke keer als we iets uitlezen of eenmalig???
+				// als we elke keer switchen moeten we misschien eerst wat testbytes sturen....			
+				
+
 				// if checkbox "use for network tool" is checked, Serial tx/rx of ducobox is swapped with tx/rx of usb converter
 				// We need to disable the RX/TX pin to prevent interference between the cp2104 and ducobox.
-				ventilation_gateway_disable_serial = PCONFIG(P151_CONFIG_USE_FOR_NETWORK_TOOL);
+				if(PCONFIG(P151_CONFIG_USE_FOR_NETWORK_TOOL)) {
+					addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_151 + F("networktool active"));
 
-				if(!ventilation_gateway_disable_serial){
-					digitalWrite(PLUGIN_151_SERIALSWITCH_PIN, HIGH); // default is high = gateway connected to ducobox
+					Serial.end();  // stop serial
+					//put pins in input mode (High impedance) to prevent interference
+					pinMode(1, INPUT); // TX
+					pinMode(3, INPUT); // RX0
+					
+					P151_PCF_set_pin_output(1, LOW); // PCF8574 SET P1 SER_SWITCH_CONNECT_DUCO =  LOW  (connect uart ducobox)
+					P151_PCF_set_pin_output(2, LOW); // PCF8574 SET P2 SER_SWITCH_SWAP_UART LOW  (uart swapped)
+					P151_PCF_set_pin_output(4, LOW); // PCF8574 SET P4 LED_SERIAL_SWITCH_GREEN = DOWN (led on)
+
+				}else{
+					// >>>>> SET PCF8574 SET pin P2 HIGH = normal LOW = swap TX/RX
+					// PCF8574 SET P2 LOW
+					P151_PCF_set_pin_output(1, LOW); // PCF8574 SET P1 SER_SWITCH_CONNECT_DUCO =  LOW  (connect uart ducobox)
+					P151_PCF_set_pin_output(2, HIGH); // PCF8574 SET P2 SER_SWITCH_SWAP_UART HIGH  (uart NOT swapped)
 
 					// reset pinmode of RX and TX to default
 					pinMode(1, FUNCTION_0); // TX
 					pinMode(3, FUNCTION_0); // RX0
-
 					Serial.begin(115200, SERIAL_8N1);
+				}	
 
-				}else{
-					// disable serial
-					Serial.end();
 
-					//put pins in input mode (High impedance) to prevent interference
-					pinMode(1, INPUT); // TX
-					pinMode(3, INPUT); // RX0
+			}else if(PCONFIG(P151_CONFIG_HARDWARE_TYPE) == P151_HARDWARE_DIY){
+				// reset pinmode of RX and TX to default
+				pinMode(1, FUNCTION_0); // TX
+				pinMode(3, FUNCTION_0); // RX0
+				Serial.begin(115200, SERIAL_8N1);
+			}
 
-					// set pin to control TS3A5017DRD16-M high
-					digitalWrite(PLUGIN_151_SERIALSWITCH_PIN, LOW); // default is high = gateway connected to ducobox
-				}
-				
 			Plugin_151_init = true;
 		}
 		
 		success = true;
 		break;
   }
+
+
+    case PLUGIN_I2C_HAS_ADDRESS:{
+		 if(PCONFIG(P151_CONFIG_HARDWARE_TYPE) == P151_HARDWARE_84_AND_HIGHER){
+			success = true;
+		 }
+      	break;
+    }
+
 
 	case PLUGIN_ONCE_A_SECOND:{
 
@@ -269,6 +391,7 @@ boolean Plugin_151(byte function, struct EventStruct *event, String &string)
 	}
 
 	case PLUGIN_SERIAL_IN: {
+		// TODO: do we need Plugin_151_init here?
 
 		// if we unexpectedly receive data we need to flush and return success=true so espeasy won't interpret it as an serial command.
 		// also ignore data if serial is disabled 
@@ -306,14 +429,20 @@ boolean Plugin_151(byte function, struct EventStruct *event, String &string)
 
 	case PLUGIN_READ:{
 
-		if(Plugin_151_init && PCONFIG(P151_CONFIG_VALUE_TYPE) == P151_VALUE_VENTMODE && !ventilation_gateway_disable_serial){
+		if(Plugin_151_init && PCONFIG(P151_CONFIG_VALUE_TYPE) == P151_VALUE_VENTMODE && ventilation_gateway_disable_serial == false){
 			// check if serial port is in use by another task, otherwise set flag.
 			if(serialPortInUseByTask == 255){
 				serialPortInUseByTask = event->TaskIndex;
 				
-				if (CONFIG_PIN1 != -1){ // status led
+				if (PCONFIG(P151_CONFIG_HARDWARE_TYPE) == P151_HARDWARE_84_AND_HIGHER){ // status led
+					P151_PCF_set_pin_output(5, LOW); // PCF8574 SET P5 LED_GREEN = LOW (led on)
+					ventilation_gateway_serial_status_led = true;
+				}else if (CONFIG_PIN1 != -1 ){
 					digitalWrite(CONFIG_PIN1, LOW);
+					ventilation_gateway_serial_status_led = true;
 				}
+				
+
 				Plugin_151_startReadNetworkList();
 			}else{
 				addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_151 + F("Serial port in use, set flag to read data later."));
@@ -325,24 +454,29 @@ boolean Plugin_151(byte function, struct EventStruct *event, String &string)
   	}
 
 	case PLUGIN_TEN_PER_SECOND: {
-   	// set statusled off
-    	if (CONFIG_PIN1 != -1){
-      	digitalWrite(CONFIG_PIN1, HIGH);
-    	}
+		if(Plugin_151_init && ventilation_gateway_serial_status_led ){
+			if (PCONFIG(P151_CONFIG_HARDWARE_TYPE) == P151_HARDWARE_84_AND_HIGHER){ // status led off
+				P151_PCF_set_pin_output(5, HIGH); // PCF8574 SET P5 LED_GREEN = HIGH (led off)
+			}else if (CONFIG_PIN1 != -1 ){
+				digitalWrite(CONFIG_PIN1, HIGH);
+			}
+			ventilation_gateway_serial_status_led = false;
 
+		}
 	   success = true;
     	break;
-  	}
+	}
 
 
 	case PLUGIN_FIFTY_PER_SECOND: {
-		if(serialPortInUseByTask == event->TaskIndex){
-			if(serialSendCommandInProgress){
-				DucoSerialSendCommand(PLUGIN_LOG_PREFIX_151);
+		if(Plugin_151_init){
+			if(serialPortInUseByTask == event->TaskIndex){
+				if(serialSendCommandInProgress){
+					DucoSerialSendCommand(PLUGIN_LOG_PREFIX_151);
+				}
 			}
 		}
-
-	   success = true;
+	   	success = true;
     	break;
   	}
 
@@ -374,15 +508,13 @@ void Plugin_151_startReadNetworkList(){
 
 
 
-
-
-
-
 void Plugin_151_processRow(struct EventStruct *event, bool serialLoggingEnabled ){
     
 	if ( PCONFIG(P151_CONFIG_LOG_SERIAL)){
-		addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_151 + F("ROW:") + (duco_serial_rowCounter) + F(" bytes read:") + duco_serial_bytes_read);
-		DucoSerialLogArray(PLUGIN_LOG_PREFIX_151, duco_serial_buf, duco_serial_bytes_read, 0);
+		//addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_151 + F("ROW:") + (duco_serial_rowCounter) + F(" bytes read:") + duco_serial_bytes_read);
+		if(duco_serial_rowCounter <3 ){
+			DucoSerialLogArray( (PLUGIN_LOG_PREFIX_151 + F("ROW:") + (duco_serial_rowCounter) + F(" bytes read:") + duco_serial_bytes_read), duco_serial_buf, duco_serial_bytes_read, 0);
+		}
 	}
 
 
@@ -494,4 +626,40 @@ int Plugin_151_parseNumericValue(char *token) {
   		return -1;
 	}
 
+}
+
+// port P0 - P7
+void P151_PCF_set_pin_output(uint8_t port, bool state){
+	if(state){ // set bit high
+		P151_PCF_pin_state =	(P151_PCF_pin_state | (1 << port));
+	}else{
+		P151_PCF_pin_state = (P151_PCF_pin_state & (~(1 << port))); // set bit low
+	}
+
+	// send outputs to PCF
+	Plugin_151_PCF8574_setReg(PLUGIN_151_PCF_ADDRESS, P151_PCF_pin_state);
+
+}
+
+
+void Plugin_151_PCF8574_setReg(uint8_t addr, uint8_t data)
+{
+	char logBuf[30];
+	snprintf(logBuf, sizeof(logBuf), "addr %#x value %#x", addr, data);
+	addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_151 + "PCF DATA " + logBuf);
+							
+
+  Wire.beginTransmission(addr);
+  Wire.write(data);
+  Wire.endTransmission();
+}
+
+uint8_t Plugin_151_PCF8574_getReg(uint8_t addr)
+{
+	Wire.requestFrom(addr, (uint8_t)0x1);
+
+	if (Wire.available()){
+		return Wire.read();
+	}
+	return 0xFF;
 }

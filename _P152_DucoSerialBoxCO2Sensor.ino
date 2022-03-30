@@ -38,7 +38,7 @@ boolean Plugin_152(byte function, struct EventStruct *event, String& string)
       {
         Device[++deviceCount].Number = PLUGIN_ID_152;
         Device[deviceCount].Type = DEVICE_TYPE_DUMMY;
-        Device[deviceCount].VType = SENSOR_TYPE_DUAL;
+        Device[deviceCount].VType = Sensor_VType::SENSOR_TYPE_DUAL;
         Device[deviceCount].Ports = 0;
         Device[deviceCount].PullUpOption = false;
         Device[deviceCount].InverseLogicOption = false;
@@ -216,7 +216,7 @@ void startReadBoxSensors(String logPrefix){
                 [SENSOR] INFO
                 CO2 :  627 [ppm] (0)
                 RH : 3246 [.01%] (0)
-                TEMP :  235 [.1°C] (0)
+                TEMP :  235 [.1Â°C] (0)
             */
 void readBoxSensorsProcessRow( String logPrefix, uint8_t sensorDeviceType, uint8_t userVarIndex, bool serialLoggingEnabled){
    
@@ -262,11 +262,10 @@ void readBoxSensorsProcessRow( String logPrefix, uint8_t sensorDeviceType, uint8
 	      if (sscanf((const char*)duco_serial_buf, "  TEMP : %u", &raw_value) == 1) {
             float temp = (float) raw_value / 10.;
             UserVar[userVarIndex] = temp;
-            snprintf(logBuf, sizeof(logBuf), "TEMP: %u = %.1f°C", raw_value, temp);
+            snprintf(logBuf, sizeof(logBuf), "TEMP: %u = %.1fÂ°C", raw_value, temp);
             addLog(LOG_LEVEL_DEBUG, logPrefix + logBuf);
          }
    	}
    }
    return;
 }
-

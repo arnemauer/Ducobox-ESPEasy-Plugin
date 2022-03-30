@@ -34,8 +34,9 @@ bool PLUGIN_150_InitRunned = false;
 
 typedef enum {
 	P150_CONFIG_DEVICE_ADDRESS = 0,
-   P150_CONFIG_LOG_RF = 1,
+    P150_CONFIG_LOG_RF = 1,
 	P150_CONFIG_RADIO_POWER = 2,
+	P150_CONFIG_HARDWARE_TYPE = 3,
 } P150PluginConfigs;
 
 
@@ -69,6 +70,27 @@ String Plugin_150_radiopower_valuename(byte value_nr) {
   	return "";
 }
 
+
+typedef enum {
+	P150_HARDWARE_DIY = 0,
+	P150_HARDWARE_83_AND_LOWER = 1,
+	P150_HARDWARE_84_AND_HIGHER = 2,
+} P150HardwareTypes;
+
+#define P150_HARDWARE_NR_OUTPUT_OPTIONS 3
+String Plugin_150_hardware_type(byte value_nr) {
+	switch (value_nr) {
+		case P150_HARDWARE_DIY:  return F("DIY esp8266 hardware");
+		case P150_HARDWARE_83_AND_LOWER:  return F("Ventilation gateway V8.3 and lower");
+		case P150_HARDWARE_84_AND_HIGHER: return F("Ventilation gateway V8.4 and higher");
+		default:
+      break;
+  	}
+  	return "";
+}
+
+
+
 boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 {
 	boolean success = false;
@@ -77,8 +99,8 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 
 		case PLUGIN_DEVICE_ADD:{
 			Device[++deviceCount].Number = PLUGIN_ID_150;
-         Device[deviceCount].Type = DEVICE_TYPE_DUAL;
-         Device[deviceCount].VType = SENSOR_TYPE_SINGLE;
+         	Device[deviceCount].Type = DEVICE_TYPE_DUAL;
+         	Device[deviceCount].VType = Sensor_VType::SENSOR_TYPE_SINGLE;
 			Device[deviceCount].Ports = 0;
 			Device[deviceCount].PullUpOption = false;
 			Device[deviceCount].InverseLogicOption = false;
@@ -119,8 +141,7 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 		
 			LoadCustomTaskSettings(event->TaskIndex, (byte*)&PLUGIN_150_ExtraSettings, sizeof(PLUGIN_150_ExtraSettings));
 			addLog(LOG_LEVEL_INFO, PLUGIN_LOG_PREFIX_150 + F("Extra Settings PLUGIN_150 loaded"));
-						
-						
+
 			// check if task is enable and IRQ pin is set, if not than reset CC1101
 			if (Settings.TaskDeviceEnabled[event->TaskIndex] == false || Settings.TaskDevicePin1[event->TaskIndex] == -1) {
 				addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_150 + F("Task disabled, checking if CC1101 needs a reset."));
@@ -137,7 +158,10 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 					addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_150 + F("IO-PIN changed, deatachinterrupt old pin"));
 					detachInterrupt(Plugin_150_IRQ_pin);
 				}
-				
+
+			
+
+								
 				PLUGIN_150_rf.setLogRFMessages(PCONFIG(P150_CONFIG_LOG_RF));
 				PLUGIN_150_rf.init();
 				PLUGIN_150_rf.setDeviceAddress(PCONFIG(P150_CONFIG_DEVICE_ADDRESS));
@@ -161,9 +185,14 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 
 				// set pinmode for status led
 				Plugin_150_LED_pin = Settings.TaskDevicePin2[event->TaskIndex];
-				if(Plugin_150_LED_pin != -1){
+				if(Plugin_150_LED_pin != -1 && PCONFIG(P150_CONFIG_HARDWARE_TYPE) != P150_HARDWARE_84_AND_HIGHER){
 					pinMode(Plugin_150_LED_pin, OUTPUT);	
 					digitalWrite(Plugin_150_LED_pin, HIGH);
+				}
+
+				if(PCONFIG(P150_CONFIG_HARDWARE_TYPE) == P150_HARDWARE_84_AND_HIGHER){
+					P151_PCF_set_pin_output(6, HIGH); // PCF8574; P6 LED_YELLOW	= HIGH (Led off)
+					P151_PCF_set_pin_output(7, HIGH); // PCF8574; P7 LED_BLUE		= HIGH (Led off)
 				}
 
 				// start initiating the CC1101 radio module
@@ -208,11 +237,18 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 			addLog(LOG_LEVEL_INFO, PLUGIN_LOG_PREFIX_150 + F("EXIT PLUGIN_150"));
 			//remove interupt when plugin is removed
 			detachInterrupt(Plugin_150_IRQ_pin);
-
 			PLUGIN_150_rf.reset(); // reset CC1101
+
+
+			if(PCONFIG(P150_CONFIG_HARDWARE_TYPE) == P150_HARDWARE_84_AND_HIGHER){
+				//P151_PCF_set_pin_output(6, HIGH); // PCF8574; P6 LED_YELLOW	= HIGH (Led off)
+				P151_PCF_set_pin_output(7, HIGH); // PCF8574; P7 LED_BLUE		= HIGH (Led off)
+			}
+
 			clearPluginTaskData(event->TaskIndex); // clear plugin taskdata
 			ClearCustomTaskSettings(event->TaskIndex); // clear networkID settings
 
+			
 			success = true;
 			break;
 		}
@@ -220,10 +256,20 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 
 		case PLUGIN_FIFTY_PER_SECOND: {
 			// check for interrupt 
-			if(PLUGIN_150_IRQ && PLUGIN_150_InitRunned){
-				PLUGIN_150_IRQ = false; // directly reset IRQ, if a new packet arrived while processing a packet the IRQ flag will be reset after processing the first packet leaving de CC1101 interrupt pin high! Only a reset will fix that.  
+			if(PLUGIN_150_InitRunned){
+				if(PLUGIN_150_IRQ){
+					if (PCONFIG(P150_CONFIG_HARDWARE_TYPE) == P150_HARDWARE_84_AND_HIGHER){ // status led
+						P151_PCF_set_pin_output(7, LOW); // PCF8574; P7 LED_BLUE		= LOW (Led on)
+						Plugin_150_LED_status = true;
+					}else if(Plugin_150_LED_pin != -1){
+						digitalWrite(Plugin_150_LED_pin, LOW);
+						Plugin_150_LED_status = true;
+					}
+					PLUGIN_150_IRQ = false; 
+				}
 				PLUGIN_150_DUCOcheck();
 			}
+
 			
 			success = true;
 			break;
@@ -233,13 +279,17 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 		case PLUGIN_TEN_PER_SECOND: {
 
 			// set statusled off
-			if(Plugin_150_LED_pin != -1){
-				if(Plugin_150_LED_status){
+			if(Plugin_150_LED_status){
+				if (PCONFIG(P150_CONFIG_HARDWARE_TYPE) == P150_HARDWARE_84_AND_HIGHER){ // status led
+					P151_PCF_set_pin_output(7, HIGH); // PCF8574; P7 LED_BLUE		= HIGH (Led off)
+					Plugin_150_LED_status = false;
+				}else if(Plugin_150_LED_pin != -1){
 					digitalWrite(Plugin_150_LED_pin, HIGH);
 					Plugin_150_LED_status = false;
 				}
 			}
 
+		
 			PLUGIN_150_rf.checkForAck();
 
 			if(PLUGIN_150_rf.pollNewDeviceAddress()){
@@ -250,11 +300,12 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
     			SaveSettings();
 			}
 			
+
+
 			uint8_t numberOfLogMessages = PLUGIN_150_rf.getNumberOfLogMessages();
 			for(int i=0; i< numberOfLogMessages;i++){
-				addLog(LOG_LEVEL_INFO, PLUGIN_LOG_PREFIX_150 + PLUGIN_150_rf.logMessages[i]);
+				addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_150 + PLUGIN_150_rf.logMessages[i]);
 			}
-
 
 			success = true;
 			break;
@@ -294,17 +345,22 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 							//override ventilation with percentage
 						String param2 = parseString(tmpString, 3); 
 						uint8_t percentage = atoi(param2.c_str()); // if empty percentage will be 0
+						if( (percentage < 0) || (percentage > 100) ){ percentage = 0; }
+
+						String param3 = parseString(tmpString, 4); 
+						uint8_t buttonPresses = atoi(param3.c_str()); // if empty buttonpresses will be 0
+						if( (buttonPresses < 1) || (buttonPresses > 3) ){ buttonPresses = 1; }
 
 						uint8_t ventilationMode = 0x99;
 						bool permanentVentilationMode = false;
 						if (param1.equalsIgnoreCase(F("AUTO")))	{ 		  				ventilationMode = 0x00;
-						}else if (param1.equalsIgnoreCase(F("LOW")))	{ 					ventilationMode = 0x04;
+						}else if (param1.equalsIgnoreCase(F("LOW")))	{ 				ventilationMode = 0x04;
 						}else if (param1.equalsIgnoreCase(F("MIDDLE")))	{ 				ventilationMode = 0x05;
 						}else if (param1.equalsIgnoreCase(F("HIGH")))	{ 				ventilationMode = 0x06;					
 						}else if (param1.equalsIgnoreCase(F("NOTHOME"))){ 				ventilationMode = 0x07; 
 						}else if (param1.equalsIgnoreCase(F("PERMANENTLOW")))	{ 		ventilationMode = 0x04; permanentVentilationMode = true;
 						}else if (param1.equalsIgnoreCase(F("PERMANENTMIDDLE")))	{ 	ventilationMode = 0x05; permanentVentilationMode = true;
-						}else if (param1.equalsIgnoreCase(F("PERMANENTHIGH")))	{ 	ventilationMode = 0x06; permanentVentilationMode = true;
+						}else if (param1.equalsIgnoreCase(F("PERMANENTHIGH")))	{ 		ventilationMode = 0x06; permanentVentilationMode = true;
 						}
 
 						if(ventilationMode == 0x99){
@@ -315,7 +371,7 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 							addLog(LOG_LEVEL_INFO, log5);
 							printWebString += log5;
 
-							PLUGIN_150_rf.requestVentilationMode(ventilationMode, permanentVentilationMode, percentage);
+							PLUGIN_150_rf.requestVentilationMode(ventilationMode, permanentVentilationMode, percentage, buttonPresses);
 						}
 
 						success = true;
@@ -509,6 +565,16 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 
 
     	case PLUGIN_WEBFORM_LOAD: {
+
+			addRowLabel(F("Hardware type"));
+			addSelector_Head(PCONFIG_LABEL(P150_CONFIG_HARDWARE_TYPE));
+
+			for (byte x = 0; x < P150_HARDWARE_NR_OUTPUT_OPTIONS; x++){
+				addSelector_Item(Plugin_150_hardware_type(x), x, PCONFIG(P150_CONFIG_HARDWARE_TYPE) == x, false, "");
+			}
+			addSelector_Foot();
+
+
 			addFormSubHeader(F("Remote RF Controls (automaticly filled after succesfull join)"));
 			char tempNetworkId [9];
 			char tempBuffer[20];
@@ -546,11 +612,17 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
     	}
 
     	case PLUGIN_WEBFORM_SAVE:{
+
+			PCONFIG(P150_CONFIG_HARDWARE_TYPE) = getFormItemInt(PCONFIG_LABEL(P150_CONFIG_HARDWARE_TYPE), 0);
+
 			unsigned long number = strtoul( web_server.arg(F("PLUGIN_150_NETWORKID")).c_str(), nullptr, 16);
 			for(int i=3; i>=0; i--){    // start with lowest byte of number
 				PLUGIN_150_ExtraSettings.networkId[i] = number & 0xFF;  // or: = byte( number);
 				number >>= 8;            // get next byte into position
 			}
+
+			addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_150 + PLUGIN_150_ExtraSettings.networkId[0] + "-" +  PLUGIN_150_ExtraSettings.networkId[1] +"-" +  PLUGIN_150_ExtraSettings.networkId[2] +"-" +  PLUGIN_150_ExtraSettings.networkId[3]);
+
 
 			PCONFIG(P150_CONFIG_DEVICE_ADDRESS) = atoi(web_server.arg(F("PLUGIN_150_DEVICEADDRESS")).c_str());
 			PCONFIG(P150_CONFIG_RADIO_POWER) = getFormItemInt(PCONFIG_LABEL(P150_CONFIG_RADIO_POWER), 0);
@@ -578,14 +650,15 @@ return success;
 // IRQ handler:
 void PLUGIN_150_interruptHandler(void)
 {
-	// for debug purpose -> save millis to see how long it takes to run PLUGIN_150_DUCOcheck()
-	test_interrupt_counter = millis();
-	// set flag
-	PLUGIN_150_IRQ = true;
+	if(PLUGIN_150_rf.checkForNewPacket()){
+		PLUGIN_150_IRQ = true; // for led
+
+	}
 }
 
 void PLUGIN_150_DUCOcheck() {
 
+/*
 	// for debug purpose -> save millis to see how long it takes to run PLUGIN_150_DUCOcheck()
 	char testintlog[40];
 	unsigned long mill = millis();
@@ -596,13 +669,11 @@ void PLUGIN_150_DUCOcheck() {
 
 	addLog(LOG_LEVEL_DEBUG,PLUGIN_LOG_PREFIX_150 + F("Start of RF signal received"));
 	//noInterrupts();
+*/
 
-	if (PLUGIN_150_rf.checkForNewPacket()){
+	PLUGIN_150_rf.processNewMessages();
 
-	if(Plugin_150_LED_pin != -1){
-		digitalWrite(Plugin_150_LED_pin, LOW);
-		Plugin_150_LED_status = true;
-	}
+
 
 		int ventilationState = PLUGIN_150_rf.getCurrentVentilationMode();
 		bool permanentMode = PLUGIN_150_rf.getCurrentPermanentMode();
@@ -626,10 +697,9 @@ void PLUGIN_150_DUCOcheck() {
 			}
 		}
 
-	}else{
 		// CC1101 automaticly discards packets when CRC isn't OK.
-		addLog(LOG_LEVEL_DEBUG,PLUGIN_LOG_PREFIX_150 + F("Ignoring RF noise"));
-	}
+	//	addLog(LOG_LEVEL_DEBUG,PLUGIN_LOG_PREFIX_150 + F("Ignoring RF noise"));
+
 
 	uint8_t numberOfLogMessages = PLUGIN_150_rf.getNumberOfLogMessages();
 
@@ -638,6 +708,8 @@ void PLUGIN_150_DUCOcheck() {
 	}
 
 }
+
+
   
 void PLUGIN_150_Publishdata(struct EventStruct *event) {
    UserVar[event->BaseVarIndex]=PLUGIN_150_State;

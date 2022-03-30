@@ -7,9 +7,9 @@
 #define CC1101PACKET_H_
 
 #include <stdio.h>
-#ifdef ESP8266
-#include <arduino.h>
-#endif
+//#ifdef ESP8266
+//#include <arduino.h>
+//#endif
 
 #define CC1101_BUFFER_LEN        64
 #define CC1101_DATA_LEN          CC1101_BUFFER_LEN - 3
@@ -29,7 +29,7 @@ class CC1101Packet
     	/**
      	* Received Strength Signal Indication
      	*/
-    	unsigned char rssi;
+    	uint8_t rssi;
 
     	/**
      	* Link Quality Index

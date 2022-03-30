@@ -44,7 +44,7 @@ boolean Plugin_155(byte function, struct EventStruct *event, String& string){
    	case PLUGIN_DEVICE_ADD:{
         	Device[++deviceCount].Number = PLUGIN_ID_155;
         	Device[deviceCount].Type = DEVICE_TYPE_DUMMY;
-			Device[deviceCount].VType = SENSOR_TYPE_TEMP_HUM;
+			Device[deviceCount].VType = Sensor_VType::SENSOR_TYPE_TEMP_HUM;
 			Device[deviceCount].Ports = 0;
 			Device[deviceCount].PullUpOption = false;
 			Device[deviceCount].InverseLogicOption = false;
@@ -224,4 +224,3 @@ boolean Plugin_155(byte function, struct EventStruct *event, String& string){
   }
   return success;
 }
-

@@ -9,6 +9,9 @@
 #include <stdio.h>
 #include "CC1101.h"
 #include "DucoPacket.h"
+#include "InboxQMessage.h"
+#include "OutboxQMessage.h"
+
 
 #define DUCO_PARAMETER							0x05
 #define CC1101_WRITE_BURST						0x40
@@ -17,6 +20,7 @@
 //pa table settings
 //const uint8_t ducoPaTableReceive[8] = {0x50, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 
+// this temporarly networkId is the hardware device ID of the node
 const uint8_t joinCO2NetworkId[4] = {0x00,0x00,0x7C,0x3E};
 
 const uint8_t ducoDeviceState_notInitialised = 0x00;	
@@ -85,10 +89,6 @@ class DucoCC1101 : protected CC1101
 		uint8_t overrulePercentage;
 		uint8_t temperature;
 
-
-
-
-
 		bool waitingForAck; 
 		uint8_t counterInAck;
 		uint8_t ackRetry;
@@ -111,14 +111,14 @@ class DucoCC1101 : protected CC1101
 		// 0x16 = initialisation failed stage 2 -> set RX mode failed or no response from cc1101
 
 		uint8_t testCounter;
-		uint8_t lastRssiByte;
+		//uint8_t lastRssiByte;
 
 		bool installerModeActive;
 		bool logRFMessages = false;
 
 
 		//String logMessages[10]; // to store some log messages from library
-		#define NUMBER_OF_LOG_STRING 13
+		#define NUMBER_OF_LOG_STRING 20
 		#define MAX_LOG_STRING_SIZE 250
 
 		uint8_t numberOfLogmessages = 0;
@@ -127,11 +127,24 @@ class DucoCC1101 : protected CC1101
 		unsigned long ackTimer;
 	//functions
 	public:
-		DucoCC1101(uint8_t counter = 0, uint8_t sendTries = 2);		//set initial counter value
+		DucoCC1101(uint8_t counter = 0, uint8_t sendTries = 3);		//set initial counter value
 		~DucoCC1101();
 				
 		DucoPacket inDucoPacket;												//stores last received message data
 		DucoPacket outDucoPacket;												//stores state of "remote"
+
+		#define OUTBOXQ_MESSAGES       4 		// duco uses a buffer of 8 messages
+		#define INBOXQ_MESSAGES        4 		// duco uses a buffer of 8 messages
+
+
+		
+		OutboxQMessage outboxQ[OUTBOXQ_MESSAGES];
+		InboxQMessage inboxQ[INBOXQ_MESSAGES];
+
+		uint8_t outboxQNextMessageNumber;
+
+		uint8_t getInboxQFreeSpot();
+		uint8_t getOutboxQFreeSpot();
 
 		void arrayToString(byte array[], unsigned int len, char buffer[]);
 
@@ -176,6 +189,7 @@ class DucoCC1101 : protected CC1101
 
 
 		void checkForAck();
+		void processReceivedAck(uint8_t messageCounter);
 
 		void sendJoinPacket();
 		void sendDisjoinPacket();
@@ -184,19 +198,27 @@ class DucoCC1101 : protected CC1101
 
 
 		void sendRawPacket(uint8_t messageType, uint8_t sourceAddress, uint8_t destinationAddress, uint8_t originalSourceAddress, uint8_t originalDestinationAddress, uint8_t *data, uint8_t length);
+		bool matchingNetworkId(uint8_t id[]);
 
 
 		//receive
-		bool checkForNewPacket();												//check RX fifo for new data
+		bool checkForNewPacket();	//check RX fifo for new data and save it to InboxQ
+		void processNewMessages(); // process messages in InboxQ 
+		void processMessage(uint8_t messageQNumber); // process message
+
+
 		bool checkForNewPacketInRXFifo();
 		uint8_t checkForBytesInRXFifo();
 
-		void requestVentilationMode(uint8_t ventilationMode, bool setPermanentVentilationMode, uint8_t percentage);	
-		void sendVentilationModeMessage(bool setPermanent, bool setVentilationMode, uint8_t ventilationMode, uint8_t percentage, uint8_t temp, bool activateInstallerMode);
+		void requestVentilationMode(uint8_t ventilationMode, bool setPermanentVentilationMode, uint8_t percentage, uint8_t buttonPresses);	
+		void sendVentilationModeMessage(bool setPermanent, bool setVentilationMode, uint8_t ventilationMode, uint8_t percentage, uint8_t temp, bool activateInstallerMode, uint8_t buttonPresses);
+		void prepareVentilationModeMessage(uint8_t outboxQMessageNumber, uint8_t commandNumber, bool setPermanent, bool setVentilationMode, uint8_t ventilationMode, uint8_t percentage, uint8_t temp, bool activateInstallerMode, uint8_t buttonPresses);
 
 		void enableInstallerMode();
 		void disableInstallerMode();
 		
+		uint8_t getRssi(uint8_t rssi);
+
 		bool getInstallerModeActive(){ return installerModeActive; }
 
 		DucoPacket getLastPacket() { return inDucoPacket; }						//retrieve last received/parsed packet from remote
@@ -204,7 +226,7 @@ class DucoCC1101 : protected CC1101
 
 		bool pollNewDeviceAddress();
 				
-		int convertRssiHexToDBm();
+		int convertRssiHexToDBm(uint8_t rssi);
 
 
 		// TEST FUNCTIONS
@@ -225,57 +247,54 @@ class DucoCC1101 : protected CC1101
 		void setLogMessage(const char *newLogMessage);
 
 
-		void sendDataToDuco(CC1101Packet *packet);
+		void sendDataToDuco(CC1101Packet *packet, uint8_t outboxMessageQNumber);
 
-
+		void resetOutDucoPacket(uint8_t outboxQMessageNumber);
 
   		char valToHex(uint8_t val);
 
  		String byteToHexString(uint8_t b);
 
-		void processJoin2Packet();
-		void sendJoin3Packet();
-		bool joinPacketValidNetworkId();
+		void processJoin2Packet(uint8_t inboxQMessageNumber);
+		void sendJoin3Packet(uint8_t inboxQMessageNumber);
+		bool joinPacketValidNetworkId(uint8_t inboxQMessageNumber);
 		
-		void processJoin4Packet();
-		void sendJoin4FinishPacket();
+		void processJoin4Packet(uint8_t inboxQMessageNumber);
+		void sendJoin4FinishPacket(uint8_t inboxQMessageNumber);
 
 
-		void finishDisjoin();
+		void finishDisjoin(uint8_t inboxQMessageNumber);
 
-		void processNetworkPacket();
+		void processNetworkPacket(uint8_t messageQNumber);
 
 		uint8_t updateMessageCounter();
-		uint8_t getRssi();
 
 		//parse received message
 		void parseReceivedPackets();
-		void parseMessageCommand();
+		void parseMessageCommand(uint8_t inboxQMessageNumber);
 				
-		void repeatMessage();
+		void repeatMessage(uint8_t inboxQMessageNumber);
 
-		void processNewVentilationMode();
+		bool processNewVentilationMode(uint8_t inboxMessageQNumber, uint8_t commandNumber, uint8_t startByteCommand);
 
 
-		void sendPing();
-		void sendConfirmationNewVentilationMode();
-		void sendNodeParameterValue();
-		void sendMultipleNodeParameterValue();
+		void sendPing(uint8_t outboxMessageQNumber, uint8_t commandNumber, uint8_t startByteCommand);
+		void sendNodeParameterValue(uint8_t outboxQMessageNumber,  uint8_t inboxQMessageNumber,uint8_t commandNumber, uint8_t startByteCommand);
 
 
 		bool matchingDeviceAddress(uint8_t compDeviceAddress);
 
-		bool matchingNetworkId(uint8_t id[]);
-
-		void getParameterValue(uint8_t parameter, uint8_t *value);
+	//	bool matchingNetworkId(uint8_t id[]);
 
 		//send
 		void ducoToCC1101Packet(DucoPacket *duco, CC1101Packet *packet);
 		void prefillDucoPacket(DucoPacket *ducoOutPacket, uint8_t receiverAddress);
 		void prefillDucoPacket(DucoPacket *ducoOutPacket, uint8_t receiverAddress, uint8_t originalSourceAddress, uint8_t originalDestinationAddress );
 
-		void sendAck();
-		void waitForAck();
+		void setCommandLength(DucoPacket *ducoOutPacket, uint8_t commandNumber, uint8_t commandLength);
+		uint8_t getCommandLength(uint8_t commandLengthByte1, uint8_t commandLengthByte2, uint8_t commandNumber);
+		void sendAck(uint8_t inboxQMessageNumber);
+		void waitForAck(uint8_t outboxQMessageNumber);
 		
 		//test
 		void testCreateMessage();

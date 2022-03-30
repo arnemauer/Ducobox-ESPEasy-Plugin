@@ -59,7 +59,7 @@ void DucoSerialSendCommand(String logPrefix) {
 
             // press "enter" to clear send bytes.
             Serial.write(0x0d);
-            delay(20);
+            delay(25);
             Serial.write(0x0a);
 
             serialSendCommandInProgress = false;
@@ -102,28 +102,34 @@ uint8_t DucoSerialInterrupt(){
 
     while (Serial.available() > 0) {
         delay(0);
-        duco_serial_buf[duco_serial_bytes_read] = Serial.read();
+        // check if there is space left in the buffer (duco_serial_buf)
+        if(duco_serial_bytes_read < DUCO_SERIAL_BUFFER_SIZE){ 
+            duco_serial_buf[duco_serial_bytes_read] = Serial.read();
 
-        if (duco_serial_buf[duco_serial_bytes_read] == 0x0d){
-            duco_serial_rowCounter++;
-            return DUCO_MESSAGE_ROW_END;
-        }    
+            if (duco_serial_buf[duco_serial_bytes_read] == 0x0d){
+                duco_serial_rowCounter++;
+                return DUCO_MESSAGE_ROW_END;
+            }    
 
-        if(duco_serial_bytes_read == 1){
-           if( (duco_serial_buf[0] == 0x3e) && (duco_serial_buf[1] == 0x20) ){  // 0x0d 0x20 0x20 0x0d 0x3e 0x20
-                return DUCO_MESSAGE_END;
+            if(duco_serial_bytes_read == 1){
+            if( (duco_serial_buf[0] == 0x3e) && (duco_serial_buf[1] == 0x20) ){  // 0x0d 0x20 0x20 0x0d 0x3e 0x20
+                    return DUCO_MESSAGE_END;
+                }
             }
+
+            duco_serial_bytes_read++;
+
+        }else{
+            // buffer is full, do we need an extra status for this? TODO!
+            return DUCO_MESSAGE_END;
         }
-
-        duco_serial_bytes_read++;
-
     }
     return DUCO_MESSAGE_FIFO_EMPTY;
 
 }
 
 
-
+/*
 // dont use this function if the serial messages is bigger than 1000 characters!
 uint8_t DucoSerialReceiveRow(String logPrefix, long timeout, bool verbose)
 {
@@ -155,7 +161,7 @@ uint8_t DucoSerialReceiveRow(String logPrefix, long timeout, bool verbose)
     
     return status;
 }
-
+*/
 
 void DucoTaskStopSerial(String logPrefix){
 	serialPortInUseByTask = 255;
@@ -198,8 +204,8 @@ int DucoSerialLogArray(String logPrefix, uint8_t array[], int len, int fromByte)
 		char lossebyte[6];
 
 		for (unsigned int i = fromByte; i <= len - 1; i++){
-			sprintf_P(lossebyte, PSTR("%02X"), array[i]); // hex output = %02X / ascii = %c
-			//sprintf_P(lossebyte, PSTR("%c"), array[i]); // hex output = %02X / ascii = %c
+			//sprintf_P(lossebyte, PSTR("%02X"), array[i]); // hex output = %02X / ascii = %c
+			sprintf_P(lossebyte, PSTR("%c"), array[i]); // hex output = %02X / ascii = %c
 
 			logstring += lossebyte;
 			if (((counter * 50) + fromByte) == i){
