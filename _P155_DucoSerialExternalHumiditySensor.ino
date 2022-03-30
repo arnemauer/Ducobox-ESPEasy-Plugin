@@ -182,9 +182,9 @@ boolean Plugin_155(byte function, struct EventStruct *event, String& string){
                switch(result){
                   case DUCO_MESSAGE_ROW_END: {
 							uint8_t userVarIndex;
-                     if(readDataType == DUCO_DATA_EXT_SENSOR_CO2_PPM){
+                     if(readDataType == DUCO_DATA_EXT_SENSOR_TEMP){
 								userVarIndex = event->BaseVarIndex;
-							}else if(readDataType == DUCO_DATA_EXT_SENSOR_TEMP){
+							}else if(readDataType == DUCO_DATA_EXT_SENSOR_RH){
 								userVarIndex = event->BaseVarIndex + 1;
 							}else{
 								break; // skip reading external sensor
