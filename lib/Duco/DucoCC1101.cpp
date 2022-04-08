@@ -645,6 +645,13 @@ void DucoCC1101::resetOutDucoPacket(uint8_t outboxQMessageNumber){
 	for(int i=0; i<4;i++) // maybe skip this?
 	outboxQ[outboxQMessageNumber].packet.networkId[i] = 0x00;
 
+	// reset status flags
+	outboxQ[outboxQMessageNumber].hasSent 		= false;
+	outboxQ[outboxQMessageNumber].waitForAck 	= false;
+	outboxQ[outboxQMessageNumber].ackReceived 	= false;
+	outboxQ[outboxQMessageNumber].ackTimer 		= 0;
+	outboxQ[outboxQMessageNumber].sendRetries 	= 0;
+
 }
 
 
