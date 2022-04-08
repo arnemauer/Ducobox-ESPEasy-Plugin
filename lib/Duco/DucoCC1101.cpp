@@ -1279,16 +1279,19 @@ void DucoCC1101::sendNodeParameterValue(uint8_t outboxQMessageNumber, uint8_t in
 
 	setCommandLength(&outboxQ[outboxQMessageNumber].packet, commandNumber, 5); // set commandlength first command, command (1byte) + parameter (2 bytes) + 2 value bytes = 5 bytes.
 
-	outboxQ[outboxQMessageNumber].packet.data[outboxQ[outboxQMessageNumber].packet.dataLength++] = 0x41; 			// byte 1: commando "response opvragen parameter"
-	outboxQ[outboxQMessageNumber].packet.data[outboxQ[outboxQMessageNumber].packet.dataLength++] = 0x00; 			// byte 2+3: parameter (2 bytes)
-	outboxQ[outboxQMessageNumber].packet.data[outboxQ[outboxQMessageNumber].packet.dataLength++] = parameter;	
-	outboxQ[outboxQMessageNumber].packet.data[outboxQ[outboxQMessageNumber].packet.dataLength++] = parameterValue1;	// byte 4: parametervalue (2 bytes)
-	outboxQ[outboxQMessageNumber].packet.data[outboxQ[outboxQMessageNumber].packet.dataLength++] = parameterValue2;	// byte 5: 
-	
-	char logBuf[30];
-	snprintf(logBuf, sizeof(logBuf), "SEND parameter %u done", parameter);
-	setLogMessage(logBuf);
-	
+	if((outboxQ[outboxQMessageNumber].packet.dataLength +5) > sizeof(outboxQ[outboxQMessageNumber].packet.data) ){
+		setLogMessage(F("Buffer overflow: not enough space to store all bytes from parameter in outboxQMessage."));
+	} else{
+		outboxQ[outboxQMessageNumber].packet.data[outboxQ[outboxQMessageNumber].packet.dataLength++] = 0x41; 			// byte 1: commando "response opvragen parameter"
+		outboxQ[outboxQMessageNumber].packet.data[outboxQ[outboxQMessageNumber].packet.dataLength++] = 0x00; 			// byte 2+3: parameter (2 bytes)
+		outboxQ[outboxQMessageNumber].packet.data[outboxQ[outboxQMessageNumber].packet.dataLength++] = parameter;	
+		outboxQ[outboxQMessageNumber].packet.data[outboxQ[outboxQMessageNumber].packet.dataLength++] = parameterValue1;	// byte 4: parametervalue (2 bytes)
+		outboxQ[outboxQMessageNumber].packet.data[outboxQ[outboxQMessageNumber].packet.dataLength++] = parameterValue2;	// byte 5: 
+		
+		char logBuf[30];
+		snprintf(logBuf, sizeof(logBuf), "SEND parameter %u done", parameter);
+		setLogMessage(logBuf);
+	}
 }
 
 
