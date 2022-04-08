@@ -618,9 +618,6 @@ void DucoCC1101::processNetworkPacket(uint8_t inboxQMessageNumber){
 	outboxQ[outboxQMessageNumber].hasSent 		= true;
 	outboxQ[outboxQMessageNumber].waitForAck 	= false;
 	outboxQ[outboxQMessageNumber].ackReceived 	= false;
-	outboxQ[outboxQMessageNumber].ackTimer 		= 0;
-	outboxQ[outboxQMessageNumber].sendRetries 	= 0;
-
 	setLogMessage(F("Send processNetworkPacket done!"));
 }
 
@@ -689,8 +686,6 @@ void DucoCC1101::sendDisjoinPacket(){
 	outboxQ[outboxQMessageNumber].hasSent 		= true;
 	outboxQ[outboxQMessageNumber].waitForAck 	= false;
 	outboxQ[outboxQMessageNumber].ackReceived 	= false;
-	outboxQ[outboxQMessageNumber].ackTimer 		= 0;
-	outboxQ[outboxQMessageNumber].sendRetries 	= 0;
 }
 
 void DucoCC1101::finishDisjoin(uint8_t inboxQMessageNumber){
@@ -815,11 +810,6 @@ void DucoCC1101::sendJoin3Packet(uint8_t inboxQMessageNumber){
 
 	// update outboxQMessage
 	outboxQ[outboxQMessageNumber].hasSent 		= true;
-	outboxQ[outboxQMessageNumber].waitForAck 	= false;
-	outboxQ[outboxQMessageNumber].ackReceived 	= false;
-	outboxQ[outboxQMessageNumber].ackTimer 		= 0;
-	outboxQ[outboxQMessageNumber].sendRetries 	= 0;
-
 	
 }
 
@@ -892,14 +882,12 @@ void DucoCC1101::waitForAck(uint8_t outboxQMessageNumber){
 // loop through all outboxq messages to check for ack!
 void DucoCC1101::checkForAck(){
 	for(uint8_t outboxQMessageNumber=0; outboxQMessageNumber < OUTBOXQ_MESSAGES;outboxQMessageNumber++){
-
-
 		if(outboxQ[outboxQMessageNumber].hasSent == true){
 			//  if waitForAck = true AND AckReceived = false
 			if( (outboxQ[outboxQMessageNumber].waitForAck == true && outboxQ[outboxQMessageNumber].ackReceived == false) ){
-							char bigLogBuf[100];
-		     snprintf(bigLogBuf, sizeof(bigLogBuf), "Q%u hassent:%u; waitforack:%u;ackreceived:%u; timer: %lu; sendTries: %u ",outboxQMessageNumber, outboxQ[outboxQMessageNumber].hasSent, outboxQ[outboxQMessageNumber].waitForAck, outboxQ[outboxQMessageNumber].ackReceived, outboxQ[outboxQMessageNumber].ackTimer, outboxQ[outboxQMessageNumber].sendRetries);
-			setLogMessage(bigLogBuf);
+				char bigLogBuf[100];
+		     	snprintf(bigLogBuf, sizeof(bigLogBuf), "Q%u hassent:%u; waitforack:%u;ackreceived:%u; timer: %lu; sendTries: %u ",outboxQMessageNumber, outboxQ[outboxQMessageNumber].hasSent, outboxQ[outboxQMessageNumber].waitForAck, outboxQ[outboxQMessageNumber].ackReceived, outboxQ[outboxQMessageNumber].ackTimer, outboxQ[outboxQMessageNumber].sendRetries);
+				setLogMessage(bigLogBuf);
 
 
 				unsigned long mill = millis();
@@ -916,7 +904,7 @@ void DucoCC1101::checkForAck(){
 						outboxQ[outboxQMessageNumber].ackTimer = millis();
 						outboxQ[outboxQMessageNumber].sendRetries++;
 			 		}else{
-						outboxQ[outboxQMessageNumber].waitForAck = 0;
+						outboxQ[outboxQMessageNumber].waitForAck = false;
 						setLogMessage(F("CheckforAck: no ack received, cancel retrying."));
 					}
 		 		}
@@ -1160,6 +1148,8 @@ void DucoCC1101::repeatMessage(uint8_t inboxQMessageNumber){
 
 	sendDataToDuco(&outMessage,outboxQMessageNumber);
 	setLogMessage(F("SEND repeatMessage() done!"));
+	// update outboxQMessage
+	outboxQ[outboxQMessageNumber].hasSent 		= true;
 }
 
 
@@ -1336,6 +1326,9 @@ void DucoCC1101::sendAck(uint8_t inboxQMessageNumber){
 
 	sendDataToDuco(&outMessage,outboxQMessageNumber);
 	setLogMessage(F("SEND ACK done!"));
+
+	// update outboxQMessage
+	outboxQ[outboxQMessageNumber].hasSent 		= true;
 }
 
 void DucoCC1101::prefillDucoPacket(DucoPacket *ducoOutPacket, uint8_t destinationAddress){
@@ -1498,6 +1491,8 @@ void DucoCC1101::sendVentilationModeMessage(bool setPermanent, bool setVentilati
 	ducoToCC1101Packet(&outboxQ[outboxQMessageNumber].packet, &outMessage);
 
 	sendDataToDuco(&outMessage,outboxQMessageNumber);
+	// update outboxQMessage
+	outboxQ[outboxQMessageNumber].hasSent 		= true;
 	waitForAck(outboxQMessageNumber);
 
 }
@@ -1580,6 +1575,9 @@ void DucoCC1101::disableInstallerMode(){
 	sendDataToDuco(&outMessage,outboxQMessageNumber);
 	setLogMessage(F("SEND disableInstallerMode done!"));
 
+	// update outboxQMessage
+	outboxQ[outboxQMessageNumber].hasSent 		= true;
+
 	waitForAck(outboxQMessageNumber);
 }
 
@@ -1632,6 +1630,10 @@ void DucoCC1101::sendTestMessage(){
 	ducoToCC1101Packet(&outboxQ[outboxQMessageNumber].packet, &outMessage);
 
 	sendDataToDuco(&outMessage,outboxQMessageNumber);
+
+	// update outboxQMessage
+	outboxQ[outboxQMessageNumber].hasSent 		= true;
+
 	return;
 }
 
@@ -1667,6 +1669,9 @@ void DucoCC1101::sendRawPacket(uint8_t messageType, uint8_t sourceAddress, uint8
 
 	sendDataToDuco(&outMessage,outboxQMessageNumber);
 	setLogMessage(F("Send raw Duco packet done!"));
+
+	// update outboxQMessage
+	outboxQ[outboxQMessageNumber].hasSent 		= true;
 }
 
 
