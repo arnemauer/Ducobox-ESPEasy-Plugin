@@ -360,9 +360,6 @@ bool DucoCC1101::checkForNewPacket()
 		inboxQ[messageNumber].packet.length = inMessage.length;
 		inboxQ[messageNumber].packet.rssiSender = inMessage.data[8];
 
-
-		
-
 		memcpy(&inboxQ[messageNumber].packet.data, &inMessage.data[9],(inMessage.length-9));
 		inboxQ[messageNumber].packet.dataLength = (inMessage.length-9);
 		return true;
@@ -502,7 +499,7 @@ void DucoCC1101::processMessage(uint8_t inboxQMessageNumber)
 	inboxQ[inboxQMessageNumber].messageProcessed = true;
 
 
-}	// end if(receiveData(&inMessage)){
+}
 	
 
 
