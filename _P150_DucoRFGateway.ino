@@ -30,7 +30,7 @@ bool PLUGIN_150_InitRunned = false;
 #define PLUGIN_ID_150         150
 #define PLUGIN_NAME_150       "DUCO ventilation remote"
 #define PLUGIN_VALUENAME1_150 "Ventilationmode"
-#define PLUGIN_LOG_PREFIX_150   String("[P150] DUCO RF GW: ")
+#define PLUGIN_LOG_PREFIX_150   String("[P150] RF GW: ")
 
 typedef enum {
 	P150_CONFIG_DEVICE_ADDRESS = 0,
