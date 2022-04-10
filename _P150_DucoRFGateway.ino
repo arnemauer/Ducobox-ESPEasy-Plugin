@@ -204,6 +204,7 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 					case 0x14: { // initialistion succesfull!
 						PLUGIN_150_InitRunned=true;
 						success = true;
+						PLUGIN_150_rf.sendSubscribeMessage(); // subscribe to ducobox to get latest ventilation mode.
 						addLog(LOG_LEVEL_INFO, PLUGIN_LOG_PREFIX_150 + F("CC1101 868Mhz transmitter initialized"));
 						break;
 					}

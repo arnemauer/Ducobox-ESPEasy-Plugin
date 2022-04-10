@@ -1027,7 +1027,7 @@ void DucoCC1101::parseMessageCommand(uint8_t inboxQMessageNumber)
 				case 0x12: // 0x12 = bevestiging wijziging ventilatiemodus
 					setLogMessage(F("Received change ventilation command"));
 					if(processNewVentilationMode(inboxQMessageNumber, commandNumber, startByteNextCommand)){ // if ventilationmode is changed, 
-						prepareVentilationModeMessage(outboxQMessageNumber, commandNumber, this->permanentVentilationMode, false, this->currentVentilationMode, 0, this->temperature, false, 0);
+						prepareVentilationModeMessage(outboxQMessageNumber, commandNumber, this->permanentVentilationMode, false, this->currentVentilationMode, 0, this->temperature, false, false, 0);
 						commandWaitForAck = true;
 						setLogMessage(F("Send sendConfirmationNewVentilationMode"));
 					}else{
@@ -1450,7 +1450,7 @@ void DucoCC1101::requestVentilationMode(uint8_t ventilationMode, bool setPermane
 	if(ventilationMode <= 7){
 		// TODO: store percentage in memory till ventilationmode changes?
 
-		sendVentilationModeMessage(setPermanentVentilationMode, true, ventilationMode, percentage, this->temperature, false, buttonPresses);
+		sendVentilationModeMessage(setPermanentVentilationMode, true, ventilationMode, percentage, this->temperature, false, false, buttonPresses);
 	}else{
 			setLogMessage(F("Invalid ventilationmode requested."));
 	}
@@ -1468,14 +1468,14 @@ void DucoCC1101::requestVentilationMode(uint8_t ventilationMode, bool setPermane
 //				bit 5-7: 000 (0) = auto, 100 (4) = LOW, 101 (5) = MIDDLE, 110 (6) = HIGH, 111 (7) = afwezigheidsstand 
 
 // Byte 5: temperature (-100)
-// Byte 6: unknown (default: 0x00)
+// Byte 6: unknown (default: 0x00) Altijd 0x00, behalve na opstarten van bedieningsschakelaar, dan 0xFF							
 // Byte 7: 
 //				bit 0-2	: 000 (always 000)
 //				bit 3-4	: aantal keer knop ingedrukt (01 = 1x; 10 = 2x; 11 = 3x ingedrukt);
 //				bit 5	: knop lang ingedrukt (0 = kort ingedrukt, 1 = lang ingedrukt) - geldt alleen voor permanent low,middle,high
 //				bit 6-7	: knopnummer (01 = knop 1, 10 = knop 2, 11 = knop 3)
 
-void DucoCC1101::sendVentilationModeMessage(bool setPermanent, bool setVentilationMode, uint8_t ventilationMode, uint8_t percentage, uint8_t temp, bool activateInstallerMode, uint8_t buttonPresses){
+void DucoCC1101::sendVentilationModeMessage(bool setPermanent, bool setVentilationMode, uint8_t ventilationMode, uint8_t percentage, uint8_t temp, bool subscribe ,bool activateInstallerMode, uint8_t buttonPresses){
 	setLogMessage(F("sendVentilationModeMessage();"));
 
 	// get a free spot in OutboxQ
@@ -1486,7 +1486,7 @@ void DucoCC1101::sendVentilationModeMessage(bool setPermanent, bool setVentilati
 	}
 	resetOutDucoPacket(outboxQMessageNumber);
 
-	prepareVentilationModeMessage(outboxQMessageNumber, 0, setPermanent, setVentilationMode, ventilationMode, percentage, temp, activateInstallerMode, buttonPresses);
+	prepareVentilationModeMessage(outboxQMessageNumber, 0, setPermanent, setVentilationMode, ventilationMode, percentage, temp, subscribe, activateInstallerMode, buttonPresses);
 
 	prefillDucoPacket(&outboxQ[outboxQMessageNumber].packet, 0x01); // address duco
 
@@ -1497,16 +1497,39 @@ void DucoCC1101::sendVentilationModeMessage(bool setPermanent, bool setVentilati
 	// update outboxQMessage
 	outboxQ[outboxQMessageNumber].hasSent 		= true;
 	waitForAck(outboxQMessageNumber);
+}
 
+
+// after a reboot send a subscribe to the ducobox to get the latest ventilation status and let the ducobox know we are online 
+void DucoCC1101::sendSubscribeMessage(){
+	setLogMessage(F("sendSubscribeMessage();"));
+
+	// get a free spot in OutboxQ
+	uint8_t outboxQMessageNumber = getOutboxQFreeSpot();
+	if(outboxQMessageNumber == 255){
+		setLogMessage(F("No free space in outboxQ, dropping message;"));
+		return;
+	}
+	resetOutDucoPacket(outboxQMessageNumber);
+
+	prepareVentilationModeMessage(outboxQMessageNumber, 0, false, false, 0, 0, this->temperature, true, false, 0);
+
+	prefillDucoPacket(&outboxQ[outboxQMessageNumber].packet, 0x01); // address duco
+
+	outboxQ[outboxQMessageNumber].packet.counter = updateMessageCounter();
+	ducoToCC1101Packet(&outboxQ[outboxQMessageNumber].packet, &outMessage);
+	
+	outboxQ[outboxQMessageNumber].waitForAck 	= true;
+	sendDataToDuco(&outMessage,outboxQMessageNumber);
 }
 
 
 
-void DucoCC1101::prepareVentilationModeMessage(uint8_t outboxQMessageNumber, uint8_t commandNumber, bool setPermanent, bool setVentilationMode, uint8_t ventilationMode, uint8_t percentage, uint8_t temp, bool activateInstallerMode, uint8_t buttonPresses){
+void DucoCC1101::prepareVentilationModeMessage(uint8_t outboxQMessageNumber, uint8_t commandNumber, bool setPermanent, bool setVentilationMode, uint8_t ventilationMode, uint8_t percentage, uint8_t temp, bool subscribe, bool activateInstallerMode, uint8_t buttonPresses){
 	uint8_t permanentModeBit = setPermanent ? 0x20 : 0x00; // 0x20 = 0010.0000
 	uint8_t installerModeBit = activateInstallerMode ? 0x10 : 0x00; // 0x10 = 0001.0000
 	uint8_t setVentilationModeBit = setVentilationMode ? 0x08 : 0x00; // 0x08 = 0000.1000
-
+	uint8_t subscribeByte =  subscribe ? 0xFF : 0x00;
 
 	// define which button is pressed. 00 = auto, 01 = button 1 (low), 02 = button 2 (middle), 03 = button 3 (high)
 	uint8_t pressedButton = 0x00;
@@ -1526,7 +1549,7 @@ void DucoCC1101::prepareVentilationModeMessage(uint8_t outboxQMessageNumber, uin
 	outboxQ[outboxQMessageNumber].packet.data[outboxQ[outboxQMessageNumber].packet.dataLength++] = percentage;
 	outboxQ[outboxQMessageNumber].packet.data[outboxQ[outboxQMessageNumber].packet.dataLength++] = (permanentModeBit | installerModeBit | setVentilationModeBit | ventilationMode); // 0x08 = 0000.1000
 	outboxQ[outboxQMessageNumber].packet.data[outboxQ[outboxQMessageNumber].packet.dataLength++] = (temp -100); // temp = 21.0c = 210 - 100 = 110 (dec) = 0x6E
-	outboxQ[outboxQMessageNumber].packet.data[outboxQ[outboxQMessageNumber].packet.dataLength++] = 0x00; // unknown
+	outboxQ[outboxQMessageNumber].packet.data[outboxQ[outboxQMessageNumber].packet.dataLength++] = subscribeByte; 
 	if(setVentilationMode){
 		outboxQ[outboxQMessageNumber].packet.data[outboxQ[outboxQMessageNumber].packet.dataLength++] =  ( (buttonPresses << 3) | (setPermanent ? 0b00000100 : 0x00) | pressedButton);
 	}else{
@@ -1551,7 +1574,7 @@ void DucoCC1101::setTemperature(int newTemperature) {
 
 
 void DucoCC1101::enableInstallerMode(){
-	sendVentilationModeMessage(this->permanentVentilationMode, false, this->currentVentilationMode, 0, this->temperature, true, 0);
+	sendVentilationModeMessage(this->permanentVentilationMode, false, this->currentVentilationMode, 0, this->temperature, false, true, 0);
 	setLogMessage(F("Send enableInstallerMode done!"));
 }
 
