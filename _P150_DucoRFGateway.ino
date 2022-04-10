@@ -6,6 +6,15 @@
 //  Parts of this code is based on the itho-library made by 'supersjimmie', 'Thinkpad', 'Klusjesman' and 'jodur'.
 //#######################################################################################################
 
+
+/*
+
+TODO:
+	- network id verdwijnt bij opslaan als plugin niet enabled is.
+	- P155 hum: https://github.com/arnemauer/Ducobox-ESPEasy-Plugin/issues/74
+
+
+*/
 #include <SPI.h>
 #include "DucoCC1101.h"
 #include "DucoPacket.h"
@@ -653,28 +662,11 @@ void PLUGIN_150_interruptHandler(void)
 {
 	if(PLUGIN_150_rf.checkForNewPacket()){
 		PLUGIN_150_IRQ = true; // for led
-
 	}
 }
 
 void PLUGIN_150_DUCOcheck() {
-
-/*
-	// for debug purpose -> save millis to see how long it takes to run PLUGIN_150_DUCOcheck()
-	char testintlog[40];
-	unsigned long mill = millis();
-	unsigned long duur = mill - test_interrupt_counter;
-	snprintf(testintlog, sizeof(testintlog),"%lu %lu %lu", mill, test_interrupt_counter, duur );
-	addLog(LOG_LEVEL_DEBUG,PLUGIN_LOG_PREFIX_150 + F("TIMER => ") + testintlog );
-	// for debug purpose -> save millis to see how long it takes to run PLUGIN_150_DUCOcheck()
-
-	addLog(LOG_LEVEL_DEBUG,PLUGIN_LOG_PREFIX_150 + F("Start of RF signal received"));
-	//noInterrupts();
-*/
-
 	PLUGIN_150_rf.processNewMessages();
-
-
 
 		int ventilationState = PLUGIN_150_rf.getCurrentVentilationMode();
 		bool permanentMode = PLUGIN_150_rf.getCurrentPermanentMode();
@@ -697,10 +689,6 @@ void PLUGIN_150_DUCOcheck() {
 				default: { 	addLog(LOG_LEVEL_DEBUG,PLUGIN_LOG_PREFIX_150 + F("Unknown ventilationmode")); }
 			}
 		}
-
-		// CC1101 automaticly discards packets when CRC isn't OK.
-	//	addLog(LOG_LEVEL_DEBUG,PLUGIN_LOG_PREFIX_150 + F("Ignoring RF noise"));
-
 
 	uint8_t numberOfLogMessages = PLUGIN_150_rf.getNumberOfLogMessages();
 
