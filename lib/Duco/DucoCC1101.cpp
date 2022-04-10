@@ -1435,7 +1435,7 @@ bool DucoCC1101::processNewVentilationMode(uint8_t inboxQMessageNumber, uint8_t 
 		newPermanentVentilationMode = (inboxQ[inboxQMessageNumber].packet.data[ (startByteCommand +1) ] & 0b00001000);
 		if(this->currentVentilationMode != newVentilationMode || this->permanentVentilationMode != newPermanentVentilationMode){
 			this->currentVentilationMode = newVentilationMode;
-			this->permanentVentilationMode = permanentVentilationMode;
+			this->permanentVentilationMode = newPermanentVentilationMode;
 			return true;
 		}
 	}
