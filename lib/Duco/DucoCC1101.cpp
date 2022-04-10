@@ -1124,6 +1124,9 @@ void DucoCC1101::parseMessageCommand(uint8_t inboxQMessageNumber)
 
 	}else{
 		setLogMessage(F("No data to send!"));
+		// free up reserved space in outboxQ
+		outboxQ[outboxQMessageNumber].hasSent 		= true;
+
 	}
 
 
