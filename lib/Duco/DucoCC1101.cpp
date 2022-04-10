@@ -229,10 +229,13 @@ used to set the maximum packet length allowed in RX. Any packet received with a 
 void DucoCC1101::sendDataToDuco(CC1101Packet *packet, uint8_t outboxQMessageNumber){
 	// DEBUG
 	if(this->logRFMessages){
-		char bigLogBuf[110]; // 32 bytes * 3 characters (hex) = max 96 characters needed as buffer
-		
-		snprintf(bigLogBuf, sizeof(bigLogBuf), "SENT message: SRC:%u; DEST:%u; ORG.SRC:%u; ORG.DEST:%u; Ntwrk:%02x%02x%02x%02x;Type:%u; Bytes:%u; Counter:%u; ",
-				  outboxQ[outboxQMessageNumber].packet.sourceAddress,outboxQ[outboxQMessageNumber].packet.destinationAddress, outboxQ[outboxQMessageNumber].packet.originalSourceAddress, outboxQ[outboxQMessageNumber].packet.originalDestinationAddress,outboxQ[outboxQMessageNumber].packet.networkId[0], outboxQ[outboxQMessageNumber].packet.networkId[1], outboxQ[outboxQMessageNumber].packet.networkId[2], outboxQ[outboxQMessageNumber].packet.networkId[3],outboxQ[outboxQMessageNumber].packet.messageType, outboxQ[outboxQMessageNumber].packet.dataLength + 10, outboxQ[outboxQMessageNumber].packet.counter);
+		char bigLogBuf[106]; // 32 bytes * 3 characters (hex) = max 96 characters needed as buffer
+		snprintf(bigLogBuf, sizeof(bigLogBuf), "SENT message (outboxQ %u): SRC:%u; DEST:%u; ORG.SRC:%u; ORG.DEST:%u; Ntwrk:%02x%02x%02x%02x;Type: %u;",
+				  outboxQMessageNumber, outboxQ[outboxQMessageNumber].packet.sourceAddress,outboxQ[outboxQMessageNumber].packet.destinationAddress, outboxQ[outboxQMessageNumber].packet.originalSourceAddress, outboxQ[outboxQMessageNumber].packet.originalDestinationAddress,outboxQ[outboxQMessageNumber].packet.networkId[0], outboxQ[outboxQMessageNumber].packet.networkId[1], outboxQ[outboxQMessageNumber].packet.networkId[2], outboxQ[outboxQMessageNumber].packet.networkId[3],outboxQ[outboxQMessageNumber].packet.messageType, outboxQ[outboxQMessageNumber].packet.dataLength + 10, outboxQ[outboxQMessageNumber].packet.counter);
+		setLogMessage(bigLogBuf);
+		memset(bigLogBuf, 0, sizeof(bigLogBuf)); // reset char bigLogBuf
+		snprintf(bigLogBuf, sizeof(bigLogBuf), "Bytes:%u; Counter:%u; WaitForAck: %u;",
+				  outboxQ[outboxQMessageNumber].packet.dataLength + 10, outboxQ[outboxQMessageNumber].packet.counter,outboxQ[outboxQMessageNumber].waitForAck);
 		setLogMessage(bigLogBuf);
 		memset(bigLogBuf, 0, sizeof(bigLogBuf)); // reset char bigLogBuf
 
@@ -381,10 +384,19 @@ void DucoCC1101::processMessage(uint8_t inboxQMessageNumber)
 {
 		// CREATE LOG ENTRY OF RECEIVED PACKET
 		if(this->logRFMessages){
-  			char bigLogBuf[250];
-		
-			snprintf(bigLogBuf, sizeof(bigLogBuf), "RECEIVED message: SRC:%u; DEST:%u; ORG.SRC:%u; ORG.DEST:%u; Ntwrk:%02x%02x%02x%02x;Type:%u; Bytes:%u; Counter:%u; RSSI:%d (0x%02X); LQI: 0x%02X",
-				  inboxQ[inboxQMessageNumber].packet.sourceAddress,inboxQ[inboxQMessageNumber].packet.destinationAddress, inboxQ[inboxQMessageNumber].packet.originalSourceAddress, inboxQ[inboxQMessageNumber].packet.originalDestinationAddress,inboxQ[inboxQMessageNumber].packet.networkId[0], inboxQ[inboxQMessageNumber].packet.networkId[1], inboxQ[inboxQMessageNumber].packet.networkId[2], inboxQ[inboxQMessageNumber].packet.networkId[3],inboxQ[inboxQMessageNumber].packet.messageType, inboxQ[inboxQMessageNumber].packet.length, inboxQ[inboxQMessageNumber].packet.counter, convertRssiHexToDBm(inboxQ[inboxQMessageNumber].packet.rssi), inboxQ[inboxQMessageNumber].packet.rssi, inboxQ[inboxQMessageNumber].packet.lqi);
+			//src/src/DataStructs/LogStruct.h LOG_STRUCT_MESSAGE_SIZE = 128 
+			// plugin prefix: "[P150] RF GW: " = 14
+			// millis timer : 8 characters
+			// 128 - 14 - 8 = 106 left
+
+  			char bigLogBuf[106]; 
+			snprintf(bigLogBuf, sizeof(bigLogBuf), "RECEIVED message (inboxQ %u):  SRC:%u; DEST:%u; ORG.SRC:%u; ORG.DEST:%u; Ntwrk:%02x%02x%02x%02x;Type: %u;",
+				  inboxQMessageNumber, inboxQ[inboxQMessageNumber].packet.sourceAddress,inboxQ[inboxQMessageNumber].packet.destinationAddress, inboxQ[inboxQMessageNumber].packet.originalSourceAddress, inboxQ[inboxQMessageNumber].packet.originalDestinationAddress,inboxQ[inboxQMessageNumber].packet.networkId[0], inboxQ[inboxQMessageNumber].packet.networkId[1], inboxQ[inboxQMessageNumber].packet.networkId[2], inboxQ[inboxQMessageNumber].packet.networkId[3],inboxQ[inboxQMessageNumber].packet.messageType, inboxQ[inboxQMessageNumber].packet.length, inboxQ[inboxQMessageNumber].packet.counter, convertRssiHexToDBm(inboxQ[inboxQMessageNumber].packet.rssi), inboxQ[inboxQMessageNumber].packet.rssi, inboxQ[inboxQMessageNumber].packet.lqi);
+			setLogMessage(bigLogBuf);
+			memset(bigLogBuf, 0, sizeof(bigLogBuf)); // reset char bigLogBuf
+
+			snprintf(bigLogBuf, sizeof(bigLogBuf), "Bytes:%u; Counter:%u; RSSI:%d (0x%02X); LQI: 0x%02X",
+				  inboxQ[inboxQMessageNumber].packet.length, inboxQ[inboxQMessageNumber].packet.counter, convertRssiHexToDBm(inboxQ[inboxQMessageNumber].packet.rssi), inboxQ[inboxQMessageNumber].packet.rssi, inboxQ[inboxQMessageNumber].packet.lqi);
 			setLogMessage(bigLogBuf);
 			memset(bigLogBuf, 0, sizeof(bigLogBuf)); // reset char bigLogBuf
 
@@ -508,10 +520,11 @@ void DucoCC1101::processMessage(uint8_t inboxQMessageNumber)
 void DucoCC1101::processReceivedAck(uint8_t inboxQMessageNumber){
 
 	for(uint8_t i=0; i< OUTBOXQ_MESSAGES;i++){
-			char bigLogBuf[60];
+			char bigLogBuf[92];
 		
-			snprintf(bigLogBuf, sizeof(bigLogBuf), "hassent:%u; waitforack:%u;ackreceived:%u; counter: %u",outboxQ[i].hasSent, outboxQ[i].waitForAck, outboxQ[i].ackReceived, outboxQ[i].packet.counter);
+			snprintf(bigLogBuf, sizeof(bigLogBuf), "ACK RECEIVED: hassent:%u; waitforack:%u;ackreceived:%u; counter: %u;",outboxQ[i].hasSent, outboxQ[i].waitForAck, outboxQ[i].ackReceived, outboxQ[i].packet.counter);
 			setLogMessage(bigLogBuf);
+			memset(bigLogBuf, 0, sizeof(bigLogBuf)); // reset char bigLogBuf
 
 
 		if(outboxQ[i].hasSent == true){
@@ -885,8 +898,8 @@ void DucoCC1101::checkForAck(){
 		if(outboxQ[outboxQMessageNumber].hasSent == true){
 			//  if waitForAck = true AND AckReceived = false
 			if( (outboxQ[outboxQMessageNumber].waitForAck == true && outboxQ[outboxQMessageNumber].ackReceived == false) ){
-				char bigLogBuf[100];
-		     	snprintf(bigLogBuf, sizeof(bigLogBuf), "Q%u hassent:%u; waitforack:%u;ackreceived:%u; timer: %lu; sendTries: %u ",outboxQMessageNumber, outboxQ[outboxQMessageNumber].hasSent, outboxQ[outboxQMessageNumber].waitForAck, outboxQ[outboxQMessageNumber].ackReceived, outboxQ[outboxQMessageNumber].ackTimer, outboxQ[outboxQMessageNumber].sendRetries);
+				char bigLogBuf[106]; // max 106!
+		     	snprintf(bigLogBuf, sizeof(bigLogBuf), "CheckforAck: message Q%u hassent:%u; waitforack:%u;ackreceived:%u; timer: %lu; sendTries: %u ",outboxQMessageNumber, outboxQ[outboxQMessageNumber].hasSent, outboxQ[outboxQMessageNumber].waitForAck, outboxQ[outboxQMessageNumber].ackReceived, outboxQ[outboxQMessageNumber].ackTimer, outboxQ[outboxQMessageNumber].sendRetries);
 				setLogMessage(bigLogBuf);
 
 

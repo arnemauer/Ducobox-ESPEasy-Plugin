@@ -119,7 +119,7 @@ class DucoCC1101 : protected CC1101
 
 		//String logMessages[10]; // to store some log messages from library
 		#define NUMBER_OF_LOG_STRING 20
-		#define MAX_LOG_STRING_SIZE 250
+		#define MAX_LOG_STRING_SIZE 128
 
 		uint8_t numberOfLogmessages = 0;
 		String logline; // used to build a log message
@@ -133,8 +133,8 @@ class DucoCC1101 : protected CC1101
 		DucoPacket inDucoPacket;												//stores last received message data
 		DucoPacket outDucoPacket;												//stores state of "remote"
 
-		#define OUTBOXQ_MESSAGES       4 		// duco uses a buffer of 8 messages
-		#define INBOXQ_MESSAGES        4 		// duco uses a buffer of 8 messages
+		#define OUTBOXQ_MESSAGES       3		// duco uses a buffer of 8 messages
+		#define INBOXQ_MESSAGES        3 		// duco uses a buffer of 8 messages
 
 
 		
