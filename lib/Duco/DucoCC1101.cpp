@@ -902,12 +902,13 @@ void DucoCC1101::checkForAck(){
 		 			if(outboxQ[outboxQMessageNumber].sendRetries < this->sendTries){
 						setLogMessage(F("CheckforAck: still waiting for ACK. Sending message again..."));
 						//resend message
+						uint8_t tempSendRetries = outboxQ[outboxQMessageNumber].sendRetries; // workaround for sendDataToDuco because sendRetries is reset to 0
 						ducoToCC1101Packet(&outboxQ[outboxQMessageNumber].packet, &outMessage);
 						sendDataToDuco(&outMessage,outboxQMessageNumber);
 						//setLogMessage("CheckforAck: message resent");
 
 						outboxQ[outboxQMessageNumber].ackTimer = millis();
-						outboxQ[outboxQMessageNumber].sendRetries++;
+						outboxQ[outboxQMessageNumber].sendRetries = ++tempSendRetries; // restore original sendRetries
 			 		}else{
 						outboxQ[outboxQMessageNumber].waitForAck = false;
 						setLogMessage(F("CheckforAck: no ack received, cancel retrying."));
