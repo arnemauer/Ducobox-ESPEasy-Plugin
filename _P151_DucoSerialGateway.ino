@@ -700,10 +700,10 @@ void P151_PCF_set_pin_output(uint8_t port, bool state){
 
 void Plugin_151_PCF8574_setReg(uint8_t addr, uint8_t data)
 {
-	char logBuf[30];
+/*	char logBuf[30];
 	snprintf(logBuf, sizeof(logBuf), "addr %#x value %#x", addr, data);
 	addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_151 + "PCF DATA " + logBuf);
-							
+*/						
 
   Wire.beginTransmission(addr);
   Wire.write(data);
