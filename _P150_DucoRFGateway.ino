@@ -254,11 +254,6 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 				//P151_PCF_set_pin_output(6, HIGH); // PCF8574; P6 LED_YELLOW	= HIGH (Led off)
 				P151_PCF_set_pin_output(7, HIGH); // PCF8574; P7 LED_BLUE		= HIGH (Led off)
 			}
-
-			clearPluginTaskData(event->TaskIndex); // clear plugin taskdata
-			ClearCustomTaskSettings(event->TaskIndex); // clear networkID settings
-
-			
 			success = true;
 			break;
 		}
