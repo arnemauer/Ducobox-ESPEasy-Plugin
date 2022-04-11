@@ -53,6 +53,7 @@ void DucoSerialSendCommand(String logPrefix) {
     }
 
     if(serialSendCommandCurrentChar <= strlen(serialSendCommand)-1){
+        delay(2); // if we sent characters to fast ducobox will miss them...
         int bytesSend = Serial.write(serialSendCommand[serialSendCommandCurrentChar]);
         if(bytesSend != 1){
             addLog(LOG_LEVEL_ERROR, logPrefix + "Error, failed sending command. Clear command and buffer");
@@ -96,8 +97,6 @@ void DucoSerialFlush()
 }  
 
 
-
-
 uint8_t DucoSerialInterrupt(){
 
     while (Serial.available() > 0) {
@@ -128,40 +127,6 @@ uint8_t DucoSerialInterrupt(){
 
 }
 
-
-/*
-// dont use this function if the serial messages is bigger than 1000 characters!
-uint8_t DucoSerialReceiveRow(String logPrefix, long timeout, bool verbose)
-{
-    long start = millis();
-    uint8_t status = 0;
-
-    // Handle RESPONSE, read serial till we received the stopword or a timeout occured.
-    while (((millis() - start) < timeout) && (status < 1) && (duco_serial_bytes_read < DUCO_SERIAL_BUFFER_SIZE) ) {
-       if (Serial.available() > 0) {
-            duco_serial_buf[duco_serial_bytes_read] = Serial.read();
-
-
-        }
-    }// end while
-
-
-    if(status == 0){ // if status isnt DUCO_MESSAGE_ROW_END OR DUCO_MESSAGE_END, check buffer size or timeout.
-        if(duco_serial_bytes_read >= DUCO_SERIAL_BUFFER_SIZE){
-            status = DUCO_MESSAGE_ARRAY_OVERFLOW;
-        }else{
-            // timout occurred
-            if (verbose) {
-                addLog(LOG_LEVEL_INFO, logPrefix + "Package receive timeout.");
-            }
-            status = DUCO_MESSAGE_TIMEOUT;
-            //DucoSerialFlush();
-        }
-    }
-    
-    return status;
-}
-*/
 
 void DucoTaskStopSerial(String logPrefix){
 	serialPortInUseByTask = 255;
@@ -204,8 +169,8 @@ int DucoSerialLogArray(String logPrefix, uint8_t array[], int len, int fromByte)
 		char lossebyte[6];
 
 		for (unsigned int i = fromByte; i <= len - 1; i++){
-			//sprintf_P(lossebyte, PSTR("%02X"), array[i]); // hex output = %02X / ascii = %c
-			sprintf_P(lossebyte, PSTR("%c"), array[i]); // hex output = %02X / ascii = %c
+			sprintf_P(lossebyte, PSTR("%02X"), array[i]); // hex output = %02X / ascii = %c
+			//sprintf_P(lossebyte, PSTR("%c"), array[i]); // hex output = %02X / ascii = %c
 
 			logstring += lossebyte;
 			if (((counter * 50) + fromByte) == i){

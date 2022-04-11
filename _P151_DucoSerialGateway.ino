@@ -69,6 +69,7 @@ typedef enum {
 //global variables
 int P151_DATA_VALUE[4]; // store here data of P151_VALUE_VENTMODE, P151_VALUE_VENT_PERCENTAGE, P151_VALUE_CURRENT_FAN and P151_VALUE_COUNTDOWN
 bool P151_mainPluginActivatedInTask = false;
+bool P151_disableCoreLogLevel = true; // if this variable is true de plugin is trying to 'disable' coreloglevel to prevent debug output from the Ducobox on the serial line (sometimes Duco network tool doesnt disable this).
 
 // when calling 'PLUGIN_READ', if serial port is in use set this flag and check in PLUGIN_ONCE_A_SECOND if serial port is free.
 bool P151_waitingForSerialPort = false;
@@ -345,6 +346,9 @@ boolean Plugin_151(byte function, struct EventStruct *event, String &string)
 			}
 
 			Plugin_151_init = true;
+			// disable coreloglevel on ducobox
+			P151_disableCoreLogLevel = true;
+
 		}
 		
 		success = true;
@@ -409,12 +413,16 @@ boolean Plugin_151(byte function, struct EventStruct *event, String &string)
 					
 				switch(result){
 					case DUCO_MESSAGE_ROW_END: {
-						Plugin_151_processRow(event,  PCONFIG(P151_CONFIG_LOG_SERIAL));
+						if(P151_disableCoreLogLevel){
+							Plugin_151_disableCoreLogLevel_processRow(event,  PCONFIG(P151_CONFIG_LOG_SERIAL));
+						}else{
+							Plugin_151_processRow(event,  PCONFIG(P151_CONFIG_LOG_SERIAL));
+						}
 						duco_serial_bytes_read = 0; // reset bytes read counter
 						break;
 					}
 					case DUCO_MESSAGE_END: {
-				      DucoThrowErrorMessage(PLUGIN_LOG_PREFIX_151, result);
+				      	DucoThrowErrorMessage(PLUGIN_LOG_PREFIX_151, result);
 						DucoTaskStopSerial(PLUGIN_LOG_PREFIX_151);
 						stop = true;
 						break;
@@ -434,16 +442,20 @@ boolean Plugin_151(byte function, struct EventStruct *event, String &string)
 			if(serialPortInUseByTask == 255){
 				serialPortInUseByTask = event->TaskIndex;
 				
-				if (PCONFIG(P151_CONFIG_HARDWARE_TYPE) == P151_HARDWARE_84_AND_HIGHER){ // status led
-					P151_PCF_set_pin_output(5, LOW); // PCF8574 SET P5 LED_GREEN = LOW (led on)
-					ventilation_gateway_serial_status_led = true;
-				}else if (CONFIG_PIN1 != -1 ){
-					digitalWrite(CONFIG_PIN1, LOW);
-					ventilation_gateway_serial_status_led = true;
-				}
-				
+				if(P151_disableCoreLogLevel){
+					Plugin_151_disableCoreLogLevel();
+				}else{
+					if (PCONFIG(P151_CONFIG_HARDWARE_TYPE) == P151_HARDWARE_84_AND_HIGHER){ // status led
+						P151_PCF_set_pin_output(5, LOW); // PCF8574 SET P5 LED_GREEN = LOW (led on)
+						ventilation_gateway_serial_status_led = true;
+					}else if (CONFIG_PIN1 != -1 ){
+						digitalWrite(CONFIG_PIN1, LOW);
+						ventilation_gateway_serial_status_led = true;
+					}
 
-				Plugin_151_startReadNetworkList();
+					Plugin_151_startReadNetworkList();
+				}
+
 			}else{
 				addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_151 + F("Serial port in use, set flag to read data later."));
 				P151_waitingForSerialPort = true;
@@ -493,6 +505,56 @@ boolean Plugin_151(byte function, struct EventStruct *event, String &string)
 }
 
 
+/* Example output:
+  coreloglevel 0x10
+  Done
+  */
+void Plugin_151_disableCoreLogLevel(){
+	addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_151 + F("Start disableCoreLogLevel"));
+	P151_disableCoreLogLevel = true;
+	// set this variables before sending command
+	ducoSerialStartReading = millis();
+	duco_serial_bytes_read = 0; // reset bytes read counter
+	duco_serial_rowCounter = 0; // reset row counter
+
+	// SEND COMMAND
+	DucoSerialStartSendCommand("coreloglevel 0x10\r\n");
+}
+
+
+void Plugin_151_disableCoreLogLevel_processRow(struct EventStruct *event, bool serialLoggingEnabled ){
+    
+	if ( PCONFIG(P151_CONFIG_LOG_SERIAL)){
+		if(duco_serial_rowCounter <3 ){
+			DucoSerialLogArray( (PLUGIN_LOG_PREFIX_151 + F("ROW:") + (duco_serial_rowCounter) + F(" bytes read:") + duco_serial_bytes_read), duco_serial_buf, duco_serial_bytes_read, 0);
+		}
+	}
+
+
+	if(duco_serial_rowCounter == 1){
+		if (DucoSerialCheckCommandInResponse(PLUGIN_LOG_PREFIX_151, "coreloglevel 0x10") ) {
+     		addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_151 + F("Received correct response on coreloglevel 0x10"));
+      } else {
+         addLog(LOG_LEVEL_ERROR, PLUGIN_LOG_PREFIX_151 + F("Received invalid response on coreloglevel 0x10"));
+			DucoTaskStopSerial(PLUGIN_LOG_PREFIX_151);
+			P151_disableCoreLogLevel = false;
+         return;
+      }
+	}else if( duco_serial_rowCounter == 2){
+		if(DucoSerialCheckCommandInResponse(PLUGIN_LOG_PREFIX_151, "  Done")){ // re-use this function to find "Done" in the response;
+			addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_151 + F("coreloglevel 0x10 is set on Ducobox"));
+    	} else {
+        	addLog(LOG_LEVEL_ERROR, PLUGIN_LOG_PREFIX_151 + F("Ducobox did not confirm coreloglevel change."));
+	  	}
+		DucoTaskStopSerial(PLUGIN_LOG_PREFIX_151);
+		P151_disableCoreLogLevel = false;
+		return;
+	}
+}
+
+
+
+
 void Plugin_151_startReadNetworkList(){
 	addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_151 + F("Start readNetworkList"));
 	
@@ -503,7 +565,6 @@ void Plugin_151_startReadNetworkList(){
 
 	// SEND COMMAND
 	DucoSerialStartSendCommand("Network\r\n");
-	//bool commandSendResult = DucoSerialSendCommand(PLUGIN_LOG_PREFIX_151, "Network\r\n");
 }
 
 
@@ -511,14 +572,12 @@ void Plugin_151_startReadNetworkList(){
 void Plugin_151_processRow(struct EventStruct *event, bool serialLoggingEnabled ){
     
 	if ( PCONFIG(P151_CONFIG_LOG_SERIAL)){
-		//addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_151 + F("ROW:") + (duco_serial_rowCounter) + F(" bytes read:") + duco_serial_bytes_read);
 		if(duco_serial_rowCounter <3 ){
 			DucoSerialLogArray( (PLUGIN_LOG_PREFIX_151 + F("ROW:") + (duco_serial_rowCounter) + F(" bytes read:") + duco_serial_bytes_read), duco_serial_buf, duco_serial_bytes_read, 0);
 		}
 	}
 
-
-	if( (duco_serial_rowCounter) == 1){
+	if(duco_serial_rowCounter == 1){
 		if (DucoSerialCheckCommandInResponse(PLUGIN_LOG_PREFIX_151, "network") ) {
      		addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_151 + F("Received correct response on network"));
       } else {
@@ -529,10 +588,7 @@ void Plugin_151_processRow(struct EventStruct *event, bool serialLoggingEnabled 
 	}else if( duco_serial_rowCounter == 4){
 		// ROW 4: columnnames => get columnnumbers by columnname
 		Plugin_151_getColumnNumbersByColumnName(event, varColumnNumbers);
-
-	
 	}else if( duco_serial_rowCounter > 4){
-
 
 
 		duco_serial_buf[duco_serial_bytes_read] = '\0'; // null terminate string
