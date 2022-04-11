@@ -218,7 +218,7 @@ void DucoCC1101::sendDataToDuco(CC1101Packet *packet, uint8_t outboxQMessageNumb
 	if(this->logRFMessages){
 		char bigLogBuf[106]; // 32 bytes * 3 characters (hex) = max 96 characters needed as buffer
 		snprintf(bigLogBuf, sizeof(bigLogBuf), "SENT message (outboxQ %u): SRC:%u; DEST:%u; ORG.SRC:%u; ORG.DEST:%u; Ntwrk:%02x%02x%02x%02x;Type: %u;",
-				  outboxQMessageNumber, outboxQ[outboxQMessageNumber].packet.sourceAddress,outboxQ[outboxQMessageNumber].packet.destinationAddress, outboxQ[outboxQMessageNumber].packet.originalSourceAddress, outboxQ[outboxQMessageNumber].packet.originalDestinationAddress,outboxQ[outboxQMessageNumber].packet.networkId[0], outboxQ[outboxQMessageNumber].packet.networkId[1], outboxQ[outboxQMessageNumber].packet.networkId[2], outboxQ[outboxQMessageNumber].packet.networkId[3],outboxQ[outboxQMessageNumber].packet.messageType, outboxQ[outboxQMessageNumber].packet.dataLength + 10, outboxQ[outboxQMessageNumber].packet.counter);
+				  outboxQMessageNumber, outboxQ[outboxQMessageNumber].packet.sourceAddress,outboxQ[outboxQMessageNumber].packet.destinationAddress, outboxQ[outboxQMessageNumber].packet.originalSourceAddress, outboxQ[outboxQMessageNumber].packet.originalDestinationAddress,outboxQ[outboxQMessageNumber].packet.networkId[0], outboxQ[outboxQMessageNumber].packet.networkId[1], outboxQ[outboxQMessageNumber].packet.networkId[2], outboxQ[outboxQMessageNumber].packet.networkId[3],outboxQ[outboxQMessageNumber].packet.messageType);
 		setLogMessage(bigLogBuf);
 		memset(bigLogBuf, 0, sizeof(bigLogBuf)); // reset char bigLogBuf
 		snprintf(bigLogBuf, sizeof(bigLogBuf), "Bytes:%u; Counter:%u; WaitForAck: %u;",
@@ -381,7 +381,7 @@ void DucoCC1101::processMessage(uint8_t inboxQMessageNumber)
 
   			char bigLogBuf[106]; 
 			snprintf(bigLogBuf, sizeof(bigLogBuf), "RECEIVED message (inboxQ %u):  SRC:%u; DEST:%u; ORG.SRC:%u; ORG.DEST:%u; Ntwrk:%02x%02x%02x%02x;Type: %u;",
-				  inboxQMessageNumber, inboxQ[inboxQMessageNumber].packet.sourceAddress,inboxQ[inboxQMessageNumber].packet.destinationAddress, inboxQ[inboxQMessageNumber].packet.originalSourceAddress, inboxQ[inboxQMessageNumber].packet.originalDestinationAddress,inboxQ[inboxQMessageNumber].packet.networkId[0], inboxQ[inboxQMessageNumber].packet.networkId[1], inboxQ[inboxQMessageNumber].packet.networkId[2], inboxQ[inboxQMessageNumber].packet.networkId[3],inboxQ[inboxQMessageNumber].packet.messageType, inboxQ[inboxQMessageNumber].packet.length, inboxQ[inboxQMessageNumber].packet.counter, convertRssiHexToDBm(inboxQ[inboxQMessageNumber].packet.rssi), inboxQ[inboxQMessageNumber].packet.rssi, inboxQ[inboxQMessageNumber].packet.lqi);
+				  inboxQMessageNumber, inboxQ[inboxQMessageNumber].packet.sourceAddress,inboxQ[inboxQMessageNumber].packet.destinationAddress, inboxQ[inboxQMessageNumber].packet.originalSourceAddress, inboxQ[inboxQMessageNumber].packet.originalDestinationAddress,inboxQ[inboxQMessageNumber].packet.networkId[0], inboxQ[inboxQMessageNumber].packet.networkId[1], inboxQ[inboxQMessageNumber].packet.networkId[2], inboxQ[inboxQMessageNumber].packet.networkId[3],inboxQ[inboxQMessageNumber].packet.messageType);
 			setLogMessage(bigLogBuf);
 			memset(bigLogBuf, 0, sizeof(bigLogBuf)); // reset char bigLogBuf
 
