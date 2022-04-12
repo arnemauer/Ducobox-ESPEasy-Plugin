@@ -579,13 +579,15 @@ void DucoCC1101::processNetworkPacket(uint8_t inboxQMessageNumber){
 		- 0x01 = installermode on
 		- 0x06 = ?????
 	*/
-	switch(inboxQ[inboxQMessageNumber].packet.data[1]){
+	switch(inboxQ[inboxQMessageNumber].packet.data[0]){
 		case 0x00: 
-			installerModeActive = false; // deactivate installerMode
-			// no log message here because we often receive a networkpacket
+			if(this->installerModeActive){
+				setLogMessage(F("Installermode deactivated!"));
+			}
+			this->installerModeActive = false; // deactivate installerMode
 			break;
 		case 0x01:
-			installerModeActive = true; // activate installerMode
+			this->installerModeActive = true; // activate installerMode
 			setLogMessage(F("Installermode activated!"));
 		break;
 		default:
