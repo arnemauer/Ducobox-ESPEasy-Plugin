@@ -21,7 +21,6 @@
 boolean Plugin_151_init = false;
 boolean ventilation_gateway_disable_serial = false;
 boolean ventilation_gateway_serial_status_led = false; // false = off, true=on; need this to prevent continues turning gpio off (or sending command to PCF) in PLUGIN_TEN_PER_SECOND
- 
 
 // 0 -> "auto" = AutomaticMode;
 // 1 -> "man1" = ManualMode1;
@@ -50,7 +49,6 @@ typedef enum {
 	P151_CONFIG_HARDWARE_TYPE = 3,
 } P151PluginConfigs; // max 8 values
 
-
 typedef enum {
 	P151_VALUE_VENTMODE = 0,
 	P151_VALUE_VENT_PERCENTAGE = 1,
@@ -64,7 +62,6 @@ typedef enum {
 	P151_HARDWARE_83_AND_LOWER = 1,
 	P151_HARDWARE_84_AND_HIGHER = 2,
 } P151HardwareTypes;
-
 
 //global variables
 int P151_DATA_VALUE[4]; // store here data of P151_VALUE_VENTMODE, P151_VALUE_VENT_PERCENTAGE, P151_VALUE_CURRENT_FAN and P151_VALUE_COUNTDOWN
@@ -143,7 +140,6 @@ boolean Plugin_151(byte function, struct EventStruct *event, String &string)
 	case PLUGIN_GET_DEVICEGPIONAMES:{
     	event->String1 = formatGpioName_output(F("Status LED"));
     	event->String2 = formatGpioName_output(F("Use as Network Tool"));
-
     	break;
   	}
 
@@ -162,26 +158,13 @@ boolean Plugin_151(byte function, struct EventStruct *event, String &string)
 
 			}
 		}
-		
-		addLog(LOG_LEVEL_INFO, PLUGIN_LOG_PREFIX_151 + F("EXIT PLUGIN_151"));
-      	clearPluginTaskData(event->TaskIndex); // clear plugin taskdata
-		//ClearCustomTaskSettings(event->TaskIndex); // clear networkID settings
-		
+		clearPluginTaskData(event->TaskIndex); // clear plugin taskdata
+		addLog(LOG_LEVEL_INFO, PLUGIN_LOG_PREFIX_151 + F("EXIT PLUGIN_151"));	
 		success = true;
 		break;
 	}
 
 	case PLUGIN_WEBFORM_LOAD: {
-
-		addRowLabel(F("Hardware type"));
-		addSelector_Head(PCONFIG_LABEL(P151_CONFIG_HARDWARE_TYPE));
-
-		for (byte x = 0; x < P151_HARDWARE_NR_OUTPUT_OPTIONS; x++){
-			addSelector_Item(Plugin_151_hardware_type(x), x, PCONFIG(P151_CONFIG_HARDWARE_TYPE) == x, false, "");
-		}
-		addSelector_Foot();
-
-
 
 		addRowLabel(F("Output Value Type"));
 		addSelector_Head(PCONFIG_LABEL(P151_CONFIG_VALUE_TYPE));
@@ -195,6 +178,10 @@ boolean Plugin_151(byte function, struct EventStruct *event, String &string)
 				if(P151_mainPluginActivatedInTask && (PCONFIG(P151_CONFIG_VALUE_TYPE) != P151_VALUE_VENTMODE) ){
 					disabled = true;
 				}
+			}else{
+				if(P151_mainPluginActivatedInTask == false || (PCONFIG(P151_CONFIG_VALUE_TYPE) == P151_VALUE_VENTMODE) ){
+					disabled = true;
+				}
 			}
 
 			addSelector_Item(name, x, PCONFIG(P151_CONFIG_VALUE_TYPE) == x, disabled, "");
@@ -202,6 +189,15 @@ boolean Plugin_151(byte function, struct EventStruct *event, String &string)
 		addSelector_Foot();
 
 		if(PCONFIG(P151_CONFIG_VALUE_TYPE) == P151_VALUE_VENTMODE){
+
+			addRowLabel(F("Hardware type"));
+			addSelector_Head_reloadOnChange(PCONFIG_LABEL(P151_CONFIG_HARDWARE_TYPE));
+
+			for (byte x = 0; x < P151_HARDWARE_NR_OUTPUT_OPTIONS; x++){
+				addSelector_Item(Plugin_151_hardware_type(x), x, PCONFIG(P151_CONFIG_HARDWARE_TYPE) == x, false, "");
+			}
+			addSelector_Foot();
+
 			addFormCheckBox(F("Log serial messages to syslog"), F("Plugin151_log_serial"), PCONFIG(P151_CONFIG_LOG_SERIAL));
 
 			// if hardware is ventilation gateway show option to use as usb-cable
@@ -220,20 +216,35 @@ boolean Plugin_151(byte function, struct EventStruct *event, String &string)
     	break;
   	}
 
-	case PLUGIN_WEBFORM_SAVE:{
-		// Save output selector parameters.
-		// check sensorTypeHelper_saveOutputSelector function, what does this?! https://github.com/letscontrolit/ESPEasy/blob/f268d21763bf32eb1d2ed35aa68266b3eec2afe9/src/src/Helpers/_Plugin_SensorTypeHelper.cpp#L159
-		sensorTypeHelper_saveOutputSelector(event, P151_CONFIG_VALUE_TYPE, 0, Plugin_151_valuename(PCONFIG(P151_CONFIG_VALUE_TYPE), true));
-		PCONFIG(P151_CONFIG_HARDWARE_TYPE) = getFormItemInt(PCONFIG_LABEL(P151_CONFIG_HARDWARE_TYPE), 0);
 
+  	case PLUGIN_WEBFORM_SHOW_VALUES: {
+		  	
+		addHtml(F("<div class=\"div_l\" id=\"xxx\">P151_mainPluginActivatedInTask: "));
+		if(P151_mainPluginActivatedInTask){
+			addHtml("TRUE");
+		}else{
+			addHtml("FALSE");
+		}
+		uint8_t temp_value_type = PCONFIG(P151_CONFIG_VALUE_TYPE);
+
+		addHtml(Plugin_151_valuename(temp_value_type, true));
+		addHtml(F("</div>"));
+		success = true; // The call to PLUGIN_WEBFORM_SHOW_VALUES should only return success = true when no regular values should be displayed
+    	break;
+	}
+
+	case PLUGIN_WEBFORM_SAVE:{
+		// Save output selector parameters.	
+		uint8_t last_config_value_type = PCONFIG(P151_CONFIG_VALUE_TYPE);	
+  		if (Plugin_151_valuename(PCONFIG(P151_CONFIG_VALUE_TYPE), true).equals(ExtraTaskSettings.TaskDeviceValueNames[0]) == false) {
+    		ZERO_FILL(ExtraTaskSettings.TaskDeviceValueNames[0]);
+  		}
+		PCONFIG(P151_CONFIG_VALUE_TYPE) = getFormItemInt(PCONFIG_LABEL(P151_CONFIG_VALUE_TYPE), 0);
 
 		if(PCONFIG(P151_CONFIG_VALUE_TYPE) == P151_VALUE_VENTMODE){
 			P151_mainPluginActivatedInTask = true;
-		}else{
-			P151_mainPluginActivatedInTask = false;
-		}
 
-		if(PCONFIG(P151_CONFIG_VALUE_TYPE) == P151_VALUE_VENTMODE){
+			PCONFIG(P151_CONFIG_HARDWARE_TYPE) = getFormItemInt(PCONFIG_LABEL(P151_CONFIG_HARDWARE_TYPE), 0);
 	  		PCONFIG(P151_CONFIG_LOG_SERIAL) = isFormItemChecked(F("Plugin151_log_serial")); 
 
 			// if hardware is ventilation gateway show option to use as usb-cable
@@ -246,8 +257,6 @@ boolean Plugin_151(byte function, struct EventStruct *event, String &string)
 			if(PCONFIG(P151_CONFIG_HARDWARE_TYPE) == P151_HARDWARE_84_AND_HIGHER){
 				Settings.TaskDevicePin1[event->TaskIndex] = -1;
 			}
-
-
 		}
 
 	 	success = true;
@@ -348,7 +357,6 @@ boolean Plugin_151(byte function, struct EventStruct *event, String &string)
 			Plugin_151_init = true;
 			// disable coreloglevel on ducobox
 			P151_disableCoreLogLevel = true;
-
 		}
 		
 		success = true;
