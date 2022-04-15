@@ -408,6 +408,9 @@ void DucoCC1101::processMessage(uint8_t inboxQMessageNumber)
 		if(matchingNetworkId(inboxQ[inboxQMessageNumber].packet.networkId)){ // check for network id
 				
 			// if destinationAddress is broadcastaddress = 0, then repeat the message
+			// TODO: if we connect through a repeater node we need to use originalSourceAddress. 
+			// Do we store counter to prevent processing the same network message?
+			// Does a node connected through a repeater repeat network messages?!
 			if(inboxQ[inboxQMessageNumber].packet.destinationAddress == 0x00 && inboxQ[inboxQMessageNumber].packet.sourceAddress == 0x01 && inboxQ[inboxQMessageNumber].packet.messageType == ducomsg_network){
 				setLogMessage(F("Received messagetype: network0"));
 				processNetworkPacket(inboxQMessageNumber);
@@ -823,6 +826,9 @@ void DucoCC1101::sendJoin3Packet(uint8_t inboxQMessageNumber){
 
 bool DucoCC1101::joinPacketValidNetworkId(uint8_t inboxQMessageNumber){
 	setLogMessage(F("joinPacketValidNetworkId()"));
+
+		// TODO! een join bericht kan ook via een repeater gestuurd worden. originalSourceAddress == 0x00; sourceAddress = repeater adres. 
+		// in dat bericht terugsturen naar repeater ipv ducobox!
 		if((inboxQ[inboxQMessageNumber].packet.sourceAddress == 0x01) && (inboxQ[inboxQMessageNumber].packet.destinationAddress == 0x00)){
 			// check if network id is in command
 			for(int i=0; i<4;i++){

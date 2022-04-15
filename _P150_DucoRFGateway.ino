@@ -91,7 +91,7 @@ String Plugin_150_hardware_type(byte value_nr) {
 	switch (value_nr) {
 		case P150_HARDWARE_DIY:  return F("DIY esp8266 hardware");
 		case P150_HARDWARE_83_AND_LOWER:  return F("Ventilation gateway V8.3 and lower");
-		case P150_HARDWARE_84_AND_HIGHER: return F("Ventilation gateway V8.4 and higher");
+		case P150_HARDWARE_84_AND_HIGHER: return F("Ventilation gateway V8.4");
 		default:
       break;
   	}

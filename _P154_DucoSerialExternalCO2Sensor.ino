@@ -18,8 +18,6 @@ boolean Plugin_154_init = false;
 // when calling 'PLUGIN_READ', if serial port is in use set this flag and check in PLUGIN_ONCE_A_SECOND if serial port is free.
 bool P154_waitingForSerialPort[TASKS_MAX];
 
-
-
 // a duco temp/humidity sensor can report the two values to the same IDX (domoticz)
 // a duco CO2 sensor reports CO2 PPM and temperature. each needs an own IDX (domoticz)
 
