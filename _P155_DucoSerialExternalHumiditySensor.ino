@@ -18,13 +18,7 @@
 boolean Plugin_155_init = false;
 // when calling 'PLUGIN_READ', if serial port is in use set this flag and check in PLUGIN_ONCE_A_SECOND if serial port is free.
 bool P155_waitingForSerialPort[TASKS_MAX];
-
-uint8_t readDataType = 0;
-bool P155_readHumidity = false;
-
-
-            // a duco temp/humidity sensor can report the two values to the same IDX (domoticz)
-            // a duco CO2 sensor reports CO2 PPM and temperature. each needs an own IDX (domoticz)
+bool P155_readTemperature[TASKS_MAX]; // true = read temperature, false = read humidity
 
 typedef enum {
     P155_CONFIG_NODE_ADDRESS = 0,
@@ -39,9 +33,8 @@ typedef enum {
 
 boolean Plugin_155(byte function, struct EventStruct *event, String& string){
 	boolean success = false;
-
   	switch (function){
-   	case PLUGIN_DEVICE_ADD:{
+   		case PLUGIN_DEVICE_ADD:{
         	Device[++deviceCount].Number = PLUGIN_ID_155;
         	Device[deviceCount].Type = DEVICE_TYPE_DUMMY;
 			Device[deviceCount].VType = Sensor_VType::SENSOR_TYPE_TEMP_HUM;
@@ -55,105 +48,97 @@ boolean Plugin_155(byte function, struct EventStruct *event, String& string){
 			Device[deviceCount].TimerOption = true;
 			Device[deviceCount].GlobalSyncOption = true;
         	break;
-      }
+		}
 
-    	case PLUGIN_GET_DEVICENAME: {
-        	string = F(PLUGIN_NAME_155);
-        	break;
-      }
+		case PLUGIN_GET_DEVICENAME: {
+			string = F(PLUGIN_NAME_155);
+			break;
+		}
 
-   	case PLUGIN_GET_DEVICEVALUENAMES:{
+		case PLUGIN_GET_DEVICEVALUENAMES:{
 			strcpy_P(ExtraTaskSettings.TaskDeviceValueNames[0], PSTR(PLUGIN_VALUENAME1_155));
 			strcpy_P(ExtraTaskSettings.TaskDeviceValueNames[1], PSTR(PLUGIN_VALUENAME2_155));
-      	break;
-      }
+			break;
+		}
 
-   	case PLUGIN_WEBFORM_LOAD:{
-      	addFormNumericBox(F("Sensor Node address"), F("Plugin_155_NODE_ADDRESS"), PCONFIG(P155_CONFIG_NODE_ADDRESS), 0, 5000);
-         addFormCheckBox(F("Log serial messages to syslog"), F("Plugin155_log_serial"), PCONFIG(P155_CONFIG_LOG_SERIAL));
-      	success = true;
-        	break;
-   	}
+		case PLUGIN_WEBFORM_LOAD:{
+			addFormNumericBox(F("Sensor Node address"), F("Plugin_155_NODE_ADDRESS"), PCONFIG(P155_CONFIG_NODE_ADDRESS), 0, 5000);
+			addFormCheckBox(F("Log serial messages to syslog"), F("Plugin155_log_serial"), PCONFIG(P155_CONFIG_LOG_SERIAL));
+			success = true;
+			break;
+		}
 
-   	case PLUGIN_WEBFORM_SAVE:{
-         PCONFIG(P155_CONFIG_NODE_ADDRESS) = getFormItemInt(F("Plugin_155_NODE_ADDRESS"));
-        	PCONFIG(P155_CONFIG_LOG_SERIAL) = isFormItemChecked(F("Plugin155_log_serial"));
-        	success = true;
-        	break;
-      }
-      
+		case PLUGIN_WEBFORM_SAVE:{
+			PCONFIG(P155_CONFIG_NODE_ADDRESS) = getFormItemInt(F("Plugin_155_NODE_ADDRESS"));
+			PCONFIG(P155_CONFIG_LOG_SERIAL) = isFormItemChecked(F("Plugin155_log_serial"));
+			success = true;
+			break;
+		}
+		
 		case PLUGIN_EXIT: {
-	   	addLog(LOG_LEVEL_INFO, PLUGIN_LOG_PREFIX_155 + F("EXIT PLUGIN_155"));
-      	clearPluginTaskData(event->TaskIndex); // clear plugin taskdata
+			addLog(LOG_LEVEL_INFO, PLUGIN_LOG_PREFIX_155 + F("EXIT PLUGIN_155"));
+			clearPluginTaskData(event->TaskIndex); // clear plugin taskdata
 			//ClearCustomTaskSettings(event->TaskIndex); // clear networkID settings
 			success = true;
 			break;
 		}
 
-
 		case PLUGIN_INIT:{
-      	//LoadTaskSettings(event->TaskIndex);        
-         if(!Plugin_155_init && !ventilation_gateway_disable_serial){
-            Serial.begin(115200, SERIAL_8N1);
-
-         }
-         addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_155 + F("Init plugin done."));
+         	if(!Plugin_155_init && !ventilation_gateway_disable_serial){
+            	Serial.begin(115200, SERIAL_8N1);
+         	}
+         	addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_155 + F("Init plugin done."));
 			P155_waitingForSerialPort[event->TaskIndex] = false;
-         Plugin_155_init = true;
+			P155_readTemperature[event->TaskIndex] = true; // read temperature first,
+         	Plugin_155_init = true;
 			success = true;
 			break;
         }
 
     	case PLUGIN_READ:{
         	if (Plugin_155_init && (PCONFIG(P155_CONFIG_NODE_ADDRESS) != 0) && !ventilation_gateway_disable_serial){
-				  				addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_155 + F("start read, eventid:") +event->TaskIndex);
+				addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_155 + F("start read, eventid:") +event->TaskIndex);
 
+				// toggle value to read.
+				P155_readTemperature[event->TaskIndex] = !P155_readTemperature[event->TaskIndex];
 
 				// check if serial port is in use by another task, otherwise set flag.
-			   if(serialPortInUseByTask == 255){
-				   serialPortInUseByTask = event->TaskIndex;
+				if(serialPortInUseByTask == 255){
+					serialPortInUseByTask = event->TaskIndex;
+					
+					// toggle P155_readTemperature for this task to read temperature/humidity; 
+					P155_readTemperature[event->TaskIndex] = !P155_readTemperature[event->TaskIndex];
 
-               addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_155 + F("Read external sensor"));
+					if(P155_readTemperature[event->TaskIndex]){ // true = read temperature
+						startReadExternalSensors(PLUGIN_LOG_PREFIX_155, DUCO_DATA_EXT_SENSOR_TEMP, PCONFIG(P155_CONFIG_NODE_ADDRESS));
+					}else{ // false = read humidity
+						startReadExternalSensors(PLUGIN_LOG_PREFIX_155, DUCO_DATA_EXT_SENSOR_RH, PCONFIG(P155_CONFIG_NODE_ADDRESS));
+					}
 
-					readDataType = DUCO_DATA_EXT_SENSOR_TEMP; // holds the datetype we are currently reading.
-               startReadExternalSensors(PLUGIN_LOG_PREFIX_155, DUCO_DATA_EXT_SENSOR_TEMP, PCONFIG(P155_CONFIG_NODE_ADDRESS));
-
-					// set true so PLUGIN_ONCE_A_SECOND will kick off reading humidity
-					P155_readHumidity = true;  
-
-            }else{
-				   addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_155 + F("Serial port in use, set flag to read data later."));
+            	}else{
+					addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_155 + F("Serial port in use, set flag to read data later."));
 					P155_waitingForSerialPort[event->TaskIndex] = true;
-			   }
+			   	}
 			}
 
         	success = true;
         	break;
-      }
+      	}
 
 
 
 
 
 		
-      case PLUGIN_ONCE_A_SECOND:{
+      	case PLUGIN_ONCE_A_SECOND:{
 			if(!ventilation_gateway_disable_serial){
-
+				// if this task is waiting for the serial port and the port is not used, start plugin_read.
 				if(P155_waitingForSerialPort[event->TaskIndex]){
-					if(serialPortInUseByTask == 255){
+					if(serialPortInUseByTask == 255){ 
 						Plugin_155(PLUGIN_READ, event, string);
 						P155_waitingForSerialPort[event->TaskIndex] = false;
 					}
 				}
-
-				if(P155_readHumidity){
-					if(serialPortInUseByTask == 255){
-						serialPortInUseByTask = event->TaskIndex;
-						startReadExternalSensors(PLUGIN_LOG_PREFIX_155, DUCO_DATA_EXT_SENSOR_RH, PCONFIG(P155_CONFIG_NODE_ADDRESS));
-						P155_readHumidity = false;
-					}
-				}
-
 				if(serialPortInUseByTask == event->TaskIndex){
 					if( (millis() - ducoSerialStartReading) > PLUGIN_READ_TIMEOUT_155){
 						addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_155 + F("Serial reading timeout"));
@@ -162,65 +147,60 @@ boolean Plugin_155(byte function, struct EventStruct *event, String& string){
 					}
 				}
 			}
-         success = true;
-         break;
-      }
+         	success = true;
+         	break;
+      	}
 
-      case PLUGIN_SERIAL_IN: {
+    	case PLUGIN_SERIAL_IN: {
 			// if we unexpectedly receive data we need to flush and return success=true so espeasy won't interpret it as an serial command.
 			if(serialPortInUseByTask == 255){
 				DucoSerialFlush();
 				success = true;
 			}
 
-         if(serialPortInUseByTask == event->TaskIndex){
-            uint8_t result =0;
-            bool stop = false;
+         	if(serialPortInUseByTask == event->TaskIndex){
+            	uint8_t result =0;
+            	bool stop = false;
             
-            while( (result = DucoSerialInterrupt()) != DUCO_MESSAGE_FIFO_EMPTY && stop == false){
-
-               switch(result){
-                  case DUCO_MESSAGE_ROW_END: {
+            	while( (result = DucoSerialInterrupt()) != DUCO_MESSAGE_FIFO_EMPTY && stop == false){
+               		switch(result){
+                  		case DUCO_MESSAGE_ROW_END: {
 							uint8_t userVarIndex;
-                     if(readDataType == DUCO_DATA_EXT_SENSOR_TEMP){
-								userVarIndex = event->BaseVarIndex;
-							}else if(readDataType == DUCO_DATA_EXT_SENSOR_RH){
-								userVarIndex = event->BaseVarIndex + 1;
-							}else{
-								break; // skip reading external sensor
+							uint8_t readDataType;
+							if(P155_readTemperature[event->TaskIndex]){ // true = read temperature
+								readExternalSensorsProcessRow(PLUGIN_LOG_PREFIX_155, event->BaseVarIndex, DUCO_DATA_EXT_SENSOR_TEMP, PCONFIG(P155_CONFIG_NODE_ADDRESS), PCONFIG(P155_CONFIG_LOG_SERIAL));
+							}else{ // false = read humidity
+								readExternalSensorsProcessRow(PLUGIN_LOG_PREFIX_155, (event->BaseVarIndex + 1), DUCO_DATA_EXT_SENSOR_RH, PCONFIG(P155_CONFIG_NODE_ADDRESS), PCONFIG(P155_CONFIG_LOG_SERIAL));
 							}
-							
-							readExternalSensorsProcessRow(PLUGIN_LOG_PREFIX_155, userVarIndex, readDataType, PCONFIG(P155_CONFIG_NODE_ADDRESS), PCONFIG(P155_CONFIG_LOG_SERIAL));
-                     duco_serial_bytes_read = 0; // reset bytes read counter
+                     		duco_serial_bytes_read = 0; // reset bytes read counter
 							break;
-                  }
-                  case DUCO_MESSAGE_END: {
-                     DucoThrowErrorMessage(PLUGIN_LOG_PREFIX_155, result);
-                     DucoTaskStopSerial(PLUGIN_LOG_PREFIX_155);
-                     stop = true;
-                     break;
-                  }
-               }
-            }
+                  		}
+                  		case DUCO_MESSAGE_END: {
+                    		DucoThrowErrorMessage(PLUGIN_LOG_PREFIX_155, result);
+                     		DucoTaskStopSerial(PLUGIN_LOG_PREFIX_155);
+                    		stop = true;
+                     		break;
+                  		}
+               		}
+            	}
 				success = true;
 			}
 		   break;
-	   }
+	   	}
 
 
-	case PLUGIN_FIFTY_PER_SECOND: {
-		if(serialPortInUseByTask == event->TaskIndex){
-			if(serialSendCommandInProgress){
-				DucoSerialSendCommand(PLUGIN_LOG_PREFIX_155);
+		case PLUGIN_FIFTY_PER_SECOND: {
+			if(serialPortInUseByTask == event->TaskIndex){
+				if(serialSendCommandInProgress){
+					DucoSerialSendCommand(PLUGIN_LOG_PREFIX_155);
+				}
 			}
-		}
-
-	   success = true;
-    	break;
-  	}
+	   		success = true;
+    		break;
+  		}
 
 
 		
-  }
-  return success;
+  	}
+	return success;
 }
