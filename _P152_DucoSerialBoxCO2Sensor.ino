@@ -212,12 +212,19 @@ void startReadBoxSensors(String logPrefix){
 }
 
 
-            /* Example output:
-                [SENSOR] INFO
-                CO2 :  627 [ppm] (0)
-                RH : 3246 [.01%] (0)
-                TEMP :  235 [.1Â°C] (0)
-            */
+   /* Example output Ducobox silent, silent connect,
+sensorinfo   
+  [SENSOR] INFO
+  CO2 :  627 [ppm] (0)
+  RH : 3246 [.01%] (0)
+  TEMP :  235 [.1Â°C] (0)
+
+      Example output Ducobox Energy Premium:
+sensorinfo
+  [SENSOR] INFO
+  RH   - SHT21 : 6252 [.01%] (0)
+  TEMP - SHT21 :  174 [.1°C] (0)
+   */
 void readBoxSensorsProcessRow( String logPrefix, uint8_t sensorDeviceType, uint8_t userVarIndex, bool serialLoggingEnabled){
    
       if(serialLoggingEnabled){	     
@@ -240,30 +247,46 @@ void readBoxSensorsProcessRow( String logPrefix, uint8_t sensorDeviceType, uint8
       char logBuf[30];
 
 
-		if(sensorDeviceType == P152_DUCO_DEVICE_CO2){
-        	if (sscanf((const char*)duco_serial_buf, "  CO2 : %u", &raw_value) == 1) {
-            unsigned int co2_ppm = raw_value; /* No conversion required */
-            UserVar[userVarIndex] = co2_ppm;
-            snprintf(logBuf, sizeof(logBuf), "CO2 PPM: %u = %u PPM", raw_value, co2_ppm);
-            addLog(LOG_LEVEL_DEBUG, logPrefix + logBuf);
+	   if(sensorDeviceType == P152_DUCO_DEVICE_CO2){     
+         if (strlen("  CO") <= duco_serial_bytes_read && strncmp("  CO", (char*) duco_serial_buf, strlen("  CO")) == 0) {
+            char* startByteValue = strchr((char*) duco_serial_buf,':');
+            if(startByteValue != NULL ){
+               if (sscanf(startByteValue, ": %u", &raw_value) == 1) {
+                  unsigned int co2_ppm = raw_value; /* No conversion required */
+                  UserVar[userVarIndex] = co2_ppm;
+                  snprintf(logBuf, sizeof(logBuf), "CO2 PPM: %u = %u PPM", raw_value, co2_ppm);
+                  addLog(LOG_LEVEL_DEBUG, logPrefix + logBuf);
+               }
             }
+        }
       }
 
 		if(sensorDeviceType == P152_DUCO_DEVICE_RH){
-	      if (sscanf((const char*)duco_serial_buf, "  RH : %u", &raw_value) == 1) {
-            float rh = (float) raw_value / 100.;
-            UserVar[userVarIndex + 1] = rh;
-            snprintf(logBuf, sizeof(logBuf), "RH: %u = %.2f%%", raw_value, rh);
-            addLog(LOG_LEVEL_DEBUG, logPrefix + logBuf);
+         if (strlen("  RH") <= duco_serial_bytes_read && strncmp("  RH", (char*) duco_serial_buf, strlen("  RH")) == 0) {
+            char* startByteValue = strchr((char*) duco_serial_buf,':');
+            if(startByteValue != NULL ){
+               if (sscanf((const char*)startByteValue, ": %u", &raw_value) == 1) {
+                  float rh = (float) raw_value / 100.;
+                  UserVar[userVarIndex + 1] = rh;
+                  snprintf(logBuf, sizeof(logBuf), "RH: %u = %.2f%%", raw_value, rh);
+                  addLog(LOG_LEVEL_DEBUG, logPrefix + logBuf);
+               }
+            }
          }
-		}
+      }
 
 		if(sensorDeviceType == P152_DUCO_DEVICE_CO2_TEMP || sensorDeviceType == P152_DUCO_DEVICE_RH){
-	      if (sscanf((const char*)duco_serial_buf, "  TEMP : %u", &raw_value) == 1) {
-            float temp = (float) raw_value / 10.;
-            UserVar[userVarIndex] = temp;
-            snprintf(logBuf, sizeof(logBuf), "TEMP: %u = %.1fÂ°C", raw_value, temp);
-            addLog(LOG_LEVEL_DEBUG, logPrefix + logBuf);
+         if (strlen("  TEMP") <= duco_serial_bytes_read && strncmp("  TEMP", (char*) duco_serial_buf, strlen("  TEMP")) == 0) {
+            addLog(LOG_LEVEL_DEBUG, logPrefix + "row starts with TEMP");
+            char* startByteValue = strchr((char*) duco_serial_buf,':');
+            if(startByteValue != NULL ){
+               if (sscanf((const char*)startByteValue, ": %u", &raw_value) == 1) {
+                  float temp = (float) raw_value / 10.;
+                  UserVar[userVarIndex] = temp;
+                  snprintf(logBuf, sizeof(logBuf), "TEMP: %u = %.1fÂ°C", raw_value, temp);
+                  addLog(LOG_LEVEL_DEBUG, logPrefix + logBuf);
+               }
+            }
          }
    	}
    }
