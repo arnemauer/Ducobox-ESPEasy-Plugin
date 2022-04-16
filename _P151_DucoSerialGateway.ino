@@ -216,23 +216,6 @@ boolean Plugin_151(byte function, struct EventStruct *event, String &string)
     	break;
   	}
 
-
-  	case PLUGIN_WEBFORM_SHOW_VALUES: {
-		  	
-		addHtml(F("<div class=\"div_l\" id=\"xxx\">P151_mainPluginActivatedInTask: "));
-		if(P151_mainPluginActivatedInTask){
-			addHtml("TRUE");
-		}else{
-			addHtml("FALSE");
-		}
-		uint8_t temp_value_type = PCONFIG(P151_CONFIG_VALUE_TYPE);
-
-		addHtml(Plugin_151_valuename(temp_value_type, true));
-		addHtml(F("</div>"));
-		success = true; // The call to PLUGIN_WEBFORM_SHOW_VALUES should only return success = true when no regular values should be displayed
-    	break;
-	}
-
 	case PLUGIN_WEBFORM_SAVE:{
 		// Save output selector parameters.	
 		uint8_t last_config_value_type = PCONFIG(P151_CONFIG_VALUE_TYPE);	
