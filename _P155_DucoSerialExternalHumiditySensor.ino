@@ -99,10 +99,7 @@ boolean Plugin_155(byte function, struct EventStruct *event, String& string){
         	if (Plugin_155_init && (PCONFIG(P155_CONFIG_NODE_ADDRESS) != 0) && !ventilation_gateway_disable_serial){
 				addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_155 + F("start read, eventid:") +event->TaskIndex);
 
-				// toggle value to read.
-				P155_readTemperature[event->TaskIndex] = !P155_readTemperature[event->TaskIndex];
-
-				// check if serial port is in use by another task, otherwise set flag.
+				// check if serial port is in use by another task, if serial is in use set flag P155_waitingForSerialPort.
 				if(serialPortInUseByTask == 255){
 					serialPortInUseByTask = event->TaskIndex;
 					
