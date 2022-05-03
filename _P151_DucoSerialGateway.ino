@@ -74,7 +74,7 @@ bool P151_waitingForSerialPort = false;
 #define P151_NR_OUTPUT_VALUES 4 // how many values do we need to read from networklist.
 uint8_t varColumnNumbers[P151_NR_OUTPUT_VALUES]; // stores the columnNumbers
 
-uint8_t P151_PCF_pin_state = 0b00000001; // pin P0 needs to be high (input)
+uint8_t P151_PCF_pin_state = 0b11110111; // pin P0 needs to be high (input)
 
 
 #define P151_VALUENAME_NR_OUTPUT_OPTIONS 5
