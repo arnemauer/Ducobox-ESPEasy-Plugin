@@ -76,6 +76,10 @@ boolean Plugin_155(byte function, struct EventStruct *event, String& string){
 		}
 		
 		case PLUGIN_EXIT: {
+			if(serialPortInUseByTask == event->TaskIndex){
+        		serialPortInUseByTask = 255;
+      		}
+
 			addLog(LOG_LEVEL_INFO, PLUGIN_LOG_PREFIX_155 + F("EXIT PLUGIN_155"));
 			clearPluginTaskData(event->TaskIndex); // clear plugin taskdata
 			//ClearCustomTaskSettings(event->TaskIndex); // clear networkID settings

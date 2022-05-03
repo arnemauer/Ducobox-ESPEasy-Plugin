@@ -110,7 +110,10 @@ boolean Plugin_154(byte function, struct EventStruct *event, String& string){
         	break;
       }
       
-	   case PLUGIN_EXIT:{
+      case PLUGIN_EXIT:{
+         if(serialPortInUseByTask == event->TaskIndex){
+        	   serialPortInUseByTask = 255;
+      	}
          addLog(LOG_LEVEL_INFO, PLUGIN_LOG_PREFIX_154 + F("EXIT PLUGIN_154"));
          clearPluginTaskData(event->TaskIndex); // clear plugin taskdata
          success = true;

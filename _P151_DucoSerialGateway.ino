@@ -146,6 +146,10 @@ boolean Plugin_151(byte function, struct EventStruct *event, String &string)
 	case PLUGIN_EXIT: {
 		if(PCONFIG(P151_CONFIG_VALUE_TYPE) == P151_VALUE_VENTMODE){
 			P151_mainPluginActivatedInTask = false;
+			if(serialPortInUseByTask == event->TaskIndex){
+				serialPortInUseByTask = 255;
+			}
+
 
 			if(PCONFIG(P151_CONFIG_HARDWARE_TYPE) == P151_HARDWARE_84_AND_HIGHER){
 				P151_PCF_set_pin_output(0, HIGH); // PCF8574; P0 serial_switch_button = HIGH (input);

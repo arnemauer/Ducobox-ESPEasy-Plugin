@@ -64,11 +64,14 @@ boolean Plugin_156(byte function, struct EventStruct *event, String& string)
       PCONFIG(P156_CONFIG_LOG_SERIAL) = isFormItemChecked(F("Plugin156_log_serial"));
       success = true;
       break;
-   }
+   	}
       
 	case PLUGIN_EXIT: {
-	   addLog(LOG_LEVEL_INFO, PLUGIN_LOG_PREFIX_156 + F("EXIT PLUGIN_156"));
-      clearPluginTaskData(event->TaskIndex); // clear plugin taskdata
+	   	if(serialPortInUseByTask == event->TaskIndex){
+    	   	serialPortInUseByTask = 255;
+      	}
+	   	addLog(LOG_LEVEL_INFO, PLUGIN_LOG_PREFIX_156 + F("EXIT PLUGIN_156"));
+      	clearPluginTaskData(event->TaskIndex); // clear plugin taskdata
 		success = true;
 		break;
 	}

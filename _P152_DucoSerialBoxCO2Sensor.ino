@@ -84,6 +84,15 @@ boolean Plugin_152(byte function, struct EventStruct *event, String& string)
 		break;
    }
 
+	case PLUGIN_EXIT: {
+      if(serialPortInUseByTask == event->TaskIndex){
+         serialPortInUseByTask = 255;
+      }
+      success = true;
+		break;
+   }
+
+
 	case PLUGIN_READ: {
    	if (Plugin_152_init && !ventilation_gateway_disable_serial){
 
