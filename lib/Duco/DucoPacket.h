@@ -23,7 +23,7 @@ class DucoPacket
 		uint8_t dataLength;
 		uint8_t length; // length of the totale message (only for receiving)
 		
-		uint8_t counter;		//0-255, counter is increased on every remote button press
+		uint8_t counter;		//0-15, MessageCounter is increased before sending a new message
 
 		/**
      	* CRC OK flag

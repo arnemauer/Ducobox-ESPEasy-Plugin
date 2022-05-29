@@ -1,41 +1,12 @@
+#include "DucoSerialHelpers.h"
+
 //#################################### Duco Serial Helpers ##################################
 //
 //  https://github.com/arnemauer/Ducobox-ESPEasy-Plugin
 //  http://arnemauer.nl/ducobox-gateway/
 //#######################################################################################################
 
-// define buffers, large, indeed. The entire datagram checksum will be checked at once
-#define DUCO_SERIAL_BUFFER_SIZE 180 // duco networklist is max 150 chars
-uint8_t duco_serial_buf[DUCO_SERIAL_BUFFER_SIZE];
-unsigned int duco_serial_bytes_read = 0;
-unsigned int duco_serial_rowCounter = 0; 
 
-uint8_t serialSendCommandCurrentChar = 0;
-bool serialSendCommandInProgress = false;
-/* To support non-blocking code, each plugins checks if the serial port is in use by another task before 
-claiming the serial port. After a task is done using the serial port the variable 'serialPortInUseByTask'
-is set to a default value '255'. 
-
-If espeasy calling 'PLUGIN_READ' from a task, it is possible that the serual port is in use.
-If that is the case the task will set a flag for itself. In 'PLUGIN_ONCE_A_SECOND' the task will check if
-there is a flag and if so, check if the serial port is in use. When the serial port isnt used by a 
-plugin (serialPortInUseByTask=255) than it will call 'PLUGIN_READ' to start receiving data.
-*/
-
-uint8_t serialPortInUseByTask = 255; 
-unsigned long ducoSerialStartReading; // filled with millis 
-
-typedef enum {
-    DUCO_MESSAGE_END = 1, // status after receiving the end of a message (0x0d 0x20 0x20 )
-    DUCO_MESSAGE_ROW_END = 2, // end of a row
-    DUCO_MESSAGE_TIMEOUT = 3,
-    DUCO_MESSAGE_ARRAY_OVERFLOW = 4,
-    DUCO_MESSAGE_FIFO_EMPTY = 5,
-
-} DucoSerialMessageStatus;
-
-
-char serialSendCommand[30]; // sensorinfo, network, nodeparaget xx xx
 void DucoSerialStartSendCommand(const char *command){
    	safe_strncpy(serialSendCommand, command, sizeof(serialSendCommand));
 	serialSendCommandCurrentChar = 0;
@@ -53,7 +24,6 @@ void DucoSerialSendCommand(String logPrefix) {
     }
 
     if(serialSendCommandCurrentChar <= strlen(serialSendCommand)-1){
-        delay(2); // if we sent characters to fast ducobox will miss them...
         int bytesSend = Serial.write(serialSendCommand[serialSendCommandCurrentChar]);
         if(bytesSend != 1){
             addLog(LOG_LEVEL_ERROR, logPrefix + "Error, failed sending command. Clear command and buffer");
@@ -65,22 +35,18 @@ void DucoSerialSendCommand(String logPrefix) {
 
             serialSendCommandInProgress = false;
             DucoTaskStopSerial(logPrefix);
-            //return false;
         }else{
             if(serialSendCommandCurrentChar >= (strlen(serialSendCommand)-1) ){
                 serialSendCommandInProgress = false;
                 addLog(LOG_LEVEL_DEBUG, logPrefix + "Send command successfull!");
-                //return false;
             }else{
                 serialSendCommandCurrentChar++;
-                //return true;
             }
         }
 
     }else{
         // counter is higher than number of chars
         serialSendCommandInProgress = false;
-        //return false; 
     }
 } // end of DucoSerialSendCommand
 
@@ -161,7 +127,7 @@ bool DucoSerialCheckCommandInResponse(String logPrefix, const char* command)
 }
 
 
-int DucoSerialLogArray(String logPrefix, uint8_t array[], int len, int fromByte) {
+void DucoSerialLogArray(String logPrefix, uint8_t array[], unsigned int len, int fromByte) {
 	unsigned int counter = 1;
 
 	if(len > 0){
@@ -182,12 +148,6 @@ int DucoSerialLogArray(String logPrefix, uint8_t array[], int len, int fromByte)
 			}
 		}
 		logstring += F(" END");
-		addLog(LOG_LEVEL_INFO, logstring);
-
-        
-       		return -1;
-
-
+		addLog(LOG_LEVEL_INFO, logstring);   
 	}
-
 }

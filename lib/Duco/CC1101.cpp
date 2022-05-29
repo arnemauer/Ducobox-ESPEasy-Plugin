@@ -181,6 +181,12 @@ void CC1101::readBurstRegister(uint8_t* buffer, uint8_t address, uint8_t length)
 }
 
 
+uint8_t CC1101::getRxBytes(){
+	uint8_t rxBytes = readRegisterWithSyncProblem(CC1101_RXBYTES, CC1101_STATUS_REGISTER);
+	return rxBytes;
+
+}
+
 
 	/* 6 (0x06) = Asserts when sync word has been sent / received, and de-asserts at the end of the packet. 
 		// automatic CRC 
@@ -190,8 +196,13 @@ uint8_t CC1101::receiveData(CC1101Packet* packet){
 	uint8_t val;
 	uint8_t rxBytes = readRegisterWithSyncProblem(CC1101_RXBYTES, CC1101_STATUS_REGISTER);
 
-	// Any byte waiting to be read and no overflow?
-	if ( (rxBytes & CC1101_BITS_RX_BYTES_IN_FIFO) && !(rxBytes & 0x80)){
+//	char bigLogBuf[20];
+//	snprintf(bigLogBuf, sizeof(bigLogBuf), "rxBYTES: %u;", (rxBytes & CC1101_BITS_RX_BYTES_IN_FIFO));
+//	Serial.println(bigLogBuf);
+
+
+	// Any byte waiting to be read
+	if ( (rxBytes & CC1101_BITS_RX_BYTES_IN_FIFO)){
 	
 		// get first byte of packet => contains total bytes of message (excl. crc)
 		//readBurstRegister(packet_length, CC1101_RXFIFO, 1);
@@ -213,19 +224,28 @@ uint8_t CC1101::receiveData(CC1101Packet* packet){
 		}
 	
 	}else{
-		flushRXAndSwitchToRX();
 		packet->length = 0;		
 	}
 
 	return packet->length;
 }
 
+bool CC1101::checkForRxFifoOverFlow(){
+	uint8_t MarcState = (readRegisterWithSyncProblem(CC1101_MARCSTATE, CC1101_STATUS_REGISTER) & CC1101_BITS_MARCSTATE);
+	if (MarcState == CC1101_MARCSTATE_RXFIFO_OVERFLOW){
+		flushRXAndSwitchToRX();
+		return true;
+	}else{
+		return false;
+	}
+}
+
 void CC1101::flushRXAndSwitchToRX(){
-	uint8_t uselessVariable = readRegister(CC1101_RXFIFO | CC1101_READ_SINGLE);
+	readRegister(CC1101_RXFIFO | CC1101_READ_SINGLE);
+	delayMicroseconds(0);
 	writeCommand(CC1101_SIDLE);	//idle
 	writeCommand(CC1101_SFRX); //flush RX buffer
 	writeCommand(CC1101_SRX); //switch to RX state	
-	return;
 }
 
 

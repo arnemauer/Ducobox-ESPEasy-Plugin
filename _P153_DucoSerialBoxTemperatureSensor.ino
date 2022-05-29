@@ -6,6 +6,9 @@
 //  http://arnemauer.nl/ducobox-gateway/
 //#######################################################################################################
 
+#include "_Plugin_Helper.h"
+#include "DucoSerialHelpers.h"
+
 #define PLUGIN_153
 #define PLUGIN_ID_153           153
 #define PLUGIN_NAME_153         "DUCO Serial GW - Box Sensor - Temperature & humidity sensor"
@@ -109,17 +112,25 @@ boolean Plugin_153(byte function, struct EventStruct *event, String& string)
 
 	case PLUGIN_READ:{
 		if (Plugin_153_init && !ventilation_gateway_disable_serial){
-
-			addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_153 + F("start read, eventid:") +event->TaskIndex);
-
+			String log;
+			log = PLUGIN_LOG_PREFIX_153;
+			log += F("start read, eventid:");
+			log += event->TaskIndex;
+			addLog(LOG_LEVEL_DEBUG, log);
 
        // check if serial port is in use by another task, otherwise set flag.
 			if(serialPortInUseByTask == 255){
 				serialPortInUseByTask = event->TaskIndex;
-            addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_153 + F("Start readBoxSensors"));
-            startReadBoxSensors(PLUGIN_LOG_PREFIX_153);
-         }else{
-				addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_153 + F("Serial port in use, set flag to read data later."));
+				log = PLUGIN_LOG_PREFIX_153;
+				log +=  F("Start readBoxSensors");
+				log += event->TaskIndex;
+				addLog(LOG_LEVEL_DEBUG, log);
+
+            	startReadBoxSensors(PLUGIN_LOG_PREFIX_153);
+         	}else{
+				log = PLUGIN_LOG_PREFIX_153;
+				log += F("Serial port in use, set flag to read data later.");
+				addLog(LOG_LEVEL_DEBUG, log);
 				P153_waitingForSerialPort = true;
 			}
 		}
@@ -139,8 +150,11 @@ boolean Plugin_153(byte function, struct EventStruct *event, String& string)
 
 			if(serialPortInUseByTask == event->TaskIndex){
 				if( (millis() - ducoSerialStartReading) > PLUGIN_READ_TIMEOUT_153){
-					addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_153 + F("Serial reading timeout"));
-					DucoTaskStopSerial(PLUGIN_LOG_PREFIX_153);
+					String log;
+					log = PLUGIN_LOG_PREFIX_153;
+					log += F("Serial reading timeout");
+					addLog(LOG_LEVEL_DEBUG, log);
+			   		DucoTaskStopSerial(PLUGIN_LOG_PREFIX_153);
 					serialPortInUseByTask = 255;
 				}
 			}

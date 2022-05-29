@@ -193,6 +193,10 @@ class CC1101
 		void sendData(CC1101Packet *packet);
 		uint8_t receiveData(CC1101Packet* packet);
 
+		uint8_t getRxBytes();
+		bool checkForRxFifoOverFlow();
+
+
 	
 	private:
 		CC1101( const CC1101 &c );

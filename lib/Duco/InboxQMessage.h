@@ -13,10 +13,10 @@ class InboxQMessage
 	public:
 
         DucoPacket packet;   
-        unsigned long time_received_message; // millis
+        unsigned long timeReceivedMessage; // stores the time (millis) we received te message. If we can't process the message within 900ms stop processing the message.
         bool messageProcessed;
         InboxQMessage(){
-                time_received_message = 0;
+                timeReceivedMessage = 0;
                 messageProcessed = true;         
         }
 

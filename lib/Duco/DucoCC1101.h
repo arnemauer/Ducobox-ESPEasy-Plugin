@@ -66,22 +66,18 @@ class DucoCC1101 : protected CC1101
 {
 	private:
 		//receive
-		CC1101Packet inMessage;												//temp storage message
+		CC1101Packet inMessage;					//temp storage message
 		CC1101Packet outMessage;
 		
-
 		//settings
-		uint8_t sendTries;														//number of times a command is send at one button press
-		
-
+		uint8_t sendTries;						//number of times a command is send at one button press
 
 		uint8_t deviceAddress;
 		uint8_t radioPower;
 		uint8_t networkId[4];
 
-		uint8_t pingCounter;
-
-		uint8_t messageCounter;
+		//uint8_t pingCounter;
+		uint8_t messageCounter;			// counter for messages the gateway sends (1-15 dec)
 
 		// keeps the current ventilationmode values
 		uint8_t currentVentilationMode;
@@ -89,9 +85,9 @@ class DucoCC1101 : protected CC1101
 		uint8_t overrulePercentage;
 		uint8_t temperature;
 
-		bool waitingForAck; 
-		uint8_t counterInAck;
-		uint8_t ackRetry;
+		//bool waitingForAck; 
+		//uint8_t counterInAck;
+		//uint8_t ackRetry;
 
 		uint8_t ducoDeviceState;
 		// 0x00 = not initialised
@@ -110,38 +106,34 @@ class DucoCC1101 : protected CC1101
 		// 0x15 = initialisation failed stage 1 -> calibration failed or no response from cc1101
 		// 0x16 = initialisation failed stage 2 -> set RX mode failed or no response from cc1101
 
-		uint8_t testCounter;
+		//uint8_t testCounter;
 		//uint8_t lastRssiByte;
 
 		bool installerModeActive;
 		bool logRFMessages = false;
 
-
-		//String logMessages[10]; // to store some log messages from library
-		#define NUMBER_OF_LOG_STRING 20
-		#define MAX_LOG_STRING_SIZE 128
-
 		uint8_t numberOfLogmessages = 0;
-		String logline; // used to build a log message
+		//String logline; // used to build a log message
 
-		unsigned long ackTimer;
+		//unsigned long ackTimer;
 	//functions
 	public:
 		DucoCC1101(uint8_t counter = 0, uint8_t sendTries = 3);		//set initial counter value
 		~DucoCC1101();
 				
-		DucoPacket inDucoPacket;												//stores last received message data
-		DucoPacket outDucoPacket;												//stores state of "remote"
+	//	DucoPacket inDucoPacket;												//stores last received message data
+//		DucoPacket outDucoPacket;												//stores state of "remote"
 
 		#define OUTBOXQ_MESSAGES       3		// duco uses a buffer of 8 messages
 		#define INBOXQ_MESSAGES        3 		// duco uses a buffer of 8 messages
 
+		bool checkAndResetRxFifoOverflow();
 
 		
 		OutboxQMessage outboxQ[OUTBOXQ_MESSAGES];
 		InboxQMessage inboxQ[INBOXQ_MESSAGES];
 
-		uint8_t outboxQNextMessageNumber;
+		//uint8_t outboxQNextMessageNumber;
 
 		uint8_t getInboxQFreeSpot();
 		uint8_t getOutboxQFreeSpot();
@@ -153,7 +145,7 @@ class DucoCC1101 : protected CC1101
 		void init() { CC1101::init(); }											//init,reset CC1101
 		void reset();
 		void initReceive();
-		uint8_t getLastCounter() { return outDucoPacket.counter; }				//counter is increased before sending a command
+		//uint8_t getLastCounter() { return outDucoPacket.counter; }				//counter is increased before sending a command
 		void setSendTries(uint8_t sendTries) { this->sendTries = sendTries; }
 		
 		void setTemperature(int temperature); // set temperature in degrees celsius x 10. 21.5 C = int (215)
@@ -165,25 +157,28 @@ class DucoCC1101 : protected CC1101
 		
 		uint8_t getDucoDeviceState() { return this->ducoDeviceState; } // retrieve radio/duco state
 		
-		// 
-		void setLogRFMessages(bool logRFMessages){ this->logRFMessages = logRFMessages; }
+		
+		void setLogRFMessages(bool logRFMessages);
 		bool getLogRFMessages() { return logRFMessages; }	
 
 
 		//deviceid
-		void setDeviceAddress(uint8_t deviceAddress){ this->deviceAddress = deviceAddress; }
+		void setGatewayAddress(uint8_t deviceAddress); // if this function name is "setDeviceAddress" the esp8266 crashes on sendData
+
 		uint8_t getDeviceAddress() { return this->deviceAddress; }	
 
 		//get/set radio power
-		void setRadioPower(uint8_t radioPower){ this->radioPower = radioPower; }
+		void setRadioPower(uint8_t radioPower);
 		uint8_t getRadioPower() { return radioPower; }	
 
 		//networkid
-		void setNetworkId(uint8_t newNetworkId[]){ 
-			memcpy(networkId, newNetworkId, 4);
-		}
+		void setNetworkId(uint8_t newNetworkId[4]);
+
 		uint8_t* getnetworkID() { return networkId; }	
 
+
+		#define NUMBER_OF_LOG_STRING 15
+		#define MAX_LOG_STRING_SIZE 128
 		uint8_t getNumberOfLogMessages();
 		char logMessages[NUMBER_OF_LOG_STRING][MAX_LOG_STRING_SIZE];
 
@@ -195,7 +190,6 @@ class DucoCC1101 : protected CC1101
 		void sendDisjoinPacket();
 
 		uint8_t getMarcState(bool noLogMessage);
-
 
 		void sendRawPacket(uint8_t messageType, uint8_t sourceAddress, uint8_t destinationAddress, uint8_t originalSourceAddress, uint8_t originalDestinationAddress, uint8_t *data, uint8_t length);
 		bool matchingNetworkId(uint8_t id[]);
@@ -222,8 +216,8 @@ class DucoCC1101 : protected CC1101
 
 		bool getInstallerModeActive(){ return installerModeActive; }
 
-		DucoPacket getLastPacket() { return inDucoPacket; }						//retrieve last received/parsed packet from remote
-		uint8_t getLastInCounter() { return inDucoPacket.counter; }						//retrieve last received/parsed command from remote
+		//DucoPacket getLastPacket() { return inDucoPacket; }						//retrieve last received/parsed packet from remote
+		//uint8_t getLastInCounter() { return inDucoPacket.counter; }						//retrieve last received/parsed command from remote
 
 		bool pollNewDeviceAddress();
 				
@@ -234,8 +228,8 @@ class DucoCC1101 : protected CC1101
 
 		uint8_t TEST_getVersion();
 		uint8_t TEST_getPartnumber();
+		uint8_t TEST_getRxBytes();
 		void TEST_GDOTest();
-	//	DucoPacket TEST_getTestMessage();
 		void sendTestMessage();
 
 
@@ -246,7 +240,6 @@ class DucoCC1101 : protected CC1101
 
 		void setLogMessage(const __FlashStringHelper* flashString);
 		void setLogMessage(const char *newLogMessage);
-
 
 		void sendDataToDuco(CC1101Packet *packet, uint8_t outboxMessageQNumber);
 
@@ -263,7 +256,6 @@ class DucoCC1101 : protected CC1101
 		void processJoin4Packet(uint8_t inboxQMessageNumber);
 		void sendJoin4FinishPacket(uint8_t inboxQMessageNumber);
 
-
 		void finishDisjoin(uint8_t inboxQMessageNumber);
 
 		void processNetworkPacket(uint8_t messageQNumber);
@@ -271,20 +263,12 @@ class DucoCC1101 : protected CC1101
 		uint8_t updateMessageCounter();
 
 		//parse received message
-		void parseReceivedPackets();
-		void parseMessageCommand(uint8_t inboxQMessageNumber);
-				
+		//void parseReceivedPackets();
+		void parseMessageCommand(uint8_t inboxQMessageNumber);	
 		void repeatMessage(uint8_t inboxQMessageNumber);
-
 		bool processNewVentilationMode(uint8_t inboxMessageQNumber, uint8_t commandNumber, uint8_t startByteCommand);
-
-
-		void sendPing(uint8_t outboxMessageQNumber, uint8_t commandNumber, uint8_t startByteCommand);
 		void sendNodeParameterValue(uint8_t outboxQMessageNumber,  uint8_t inboxQMessageNumber,uint8_t commandNumber, uint8_t startByteCommand);
-
-
 		bool matchingDeviceAddress(uint8_t compDeviceAddress);
-
 	//	bool matchingNetworkId(uint8_t id[]);
 
 		//send

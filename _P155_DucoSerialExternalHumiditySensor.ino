@@ -6,6 +6,10 @@
 //  http://arnemauer.nl/ducobox-gateway/
 //#######################################################################################################
 
+#include "_Plugin_Helper.h"
+#include "DucoSerialHelpers.h"
+
+
 #define PLUGIN_155
 #define PLUGIN_ID_155           155
 #define PLUGIN_NAME_155         "DUCO Serial GW - External Humidity Sensor"
@@ -80,9 +84,11 @@ boolean Plugin_155(byte function, struct EventStruct *event, String& string){
         		serialPortInUseByTask = 255;
       		}
 
-			addLog(LOG_LEVEL_INFO, PLUGIN_LOG_PREFIX_155 + F("EXIT PLUGIN_155"));
+			String log = PLUGIN_LOG_PREFIX_155;
+			log += F("EXIT PLUGIN_155");
+			addLogMove(LOG_LEVEL_INFO, log);
+
 			clearPluginTaskData(event->TaskIndex); // clear plugin taskdata
-			//ClearCustomTaskSettings(event->TaskIndex); // clear networkID settings
 			success = true;
 			break;
 		}
@@ -91,8 +97,10 @@ boolean Plugin_155(byte function, struct EventStruct *event, String& string){
          	if(!Plugin_155_init && !ventilation_gateway_disable_serial){
             	Serial.begin(115200, SERIAL_8N1);
          	}
-         	addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_155 + F("Init plugin done."));
-			P155_waitingForSerialPort[event->TaskIndex] = false;
+   			String log = PLUGIN_LOG_PREFIX_155;
+         	log += F("Init plugin done.");
+         	addLogMove(LOG_LEVEL_INFO, log);
+		 	P155_waitingForSerialPort[event->TaskIndex] = false;
 			P155_readTemperature[event->TaskIndex] = true; // read temperature first,
          	Plugin_155_init = true;
 			success = true;
@@ -101,8 +109,10 @@ boolean Plugin_155(byte function, struct EventStruct *event, String& string){
 
     	case PLUGIN_READ:{
         	if (Plugin_155_init && (PCONFIG(P155_CONFIG_NODE_ADDRESS) != 0) && !ventilation_gateway_disable_serial){
-				addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_155 + F("start read, eventid:") +event->TaskIndex);
-
+				String log = PLUGIN_LOG_PREFIX_155;
+				log += F("start read, eventid:");
+				log += event->TaskIndex;
+				addLogMove(LOG_LEVEL_DEBUG, log);
 				// check if serial port is in use by another task, if serial is in use set flag P155_waitingForSerialPort.
 				if(serialPortInUseByTask == 255){
 					serialPortInUseByTask = event->TaskIndex;
@@ -117,7 +127,12 @@ boolean Plugin_155(byte function, struct EventStruct *event, String& string){
 					}
 
             	}else{
-					addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_155 + F("Serial port in use, set flag to read data later."));
+					char serialPortInUse[40];
+					snprintf(serialPortInUse, sizeof(serialPortInUse)," %u, set flag to read data later.", serialPortInUseByTask);
+					log = PLUGIN_LOG_PREFIX_155;
+					log += F("Serial port in use by taskid");
+					log += serialPortInUse;
+					addLogMove(LOG_LEVEL_DEBUG, log);
 					P155_waitingForSerialPort[event->TaskIndex] = true;
 			   	}
 			}
@@ -142,8 +157,10 @@ boolean Plugin_155(byte function, struct EventStruct *event, String& string){
 				}
 				if(serialPortInUseByTask == event->TaskIndex){
 					if( (millis() - ducoSerialStartReading) > PLUGIN_READ_TIMEOUT_155){
-						addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_155 + F("Serial reading timeout"));
-						DucoTaskStopSerial(PLUGIN_LOG_PREFIX_155);
+                  		String log = PLUGIN_LOG_PREFIX_155;
+                  		log += F("Serial reading timeout");
+                  		addLogMove(LOG_LEVEL_DEBUG, log);
+				  		DucoTaskStopSerial(PLUGIN_LOG_PREFIX_155);
 						serialPortInUseByTask = 255;
 					}
 				}
@@ -166,8 +183,6 @@ boolean Plugin_155(byte function, struct EventStruct *event, String& string){
             	while( (result = DucoSerialInterrupt()) != DUCO_MESSAGE_FIFO_EMPTY && stop == false){
                		switch(result){
                   		case DUCO_MESSAGE_ROW_END: {
-							uint8_t userVarIndex;
-							uint8_t readDataType;
 							if(P155_readTemperature[event->TaskIndex]){ // true = read temperature
 								readExternalSensorsProcessRow(PLUGIN_LOG_PREFIX_155, event->BaseVarIndex, DUCO_DATA_EXT_SENSOR_TEMP, PCONFIG(P155_CONFIG_NODE_ADDRESS), PCONFIG(P155_CONFIG_LOG_SERIAL));
 							}else{ // false = read humidity

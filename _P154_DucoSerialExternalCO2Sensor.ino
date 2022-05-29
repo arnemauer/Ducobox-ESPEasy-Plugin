@@ -8,6 +8,10 @@
 
 // TODO: add a device parser for device droplist.
 
+#include "_Plugin_Helper.h"
+#include "DucoSerialHelpers.h"
+
+
 #define PLUGIN_154
 #define PLUGIN_ID_154           154
 #define PLUGIN_NAME_154         "DUCO Serial GW - External CO2 Sensor (CO2 & Temperature)"
@@ -114,7 +118,9 @@ boolean Plugin_154(byte function, struct EventStruct *event, String& string){
          if(serialPortInUseByTask == event->TaskIndex){
         	   serialPortInUseByTask = 255;
       	}
-         addLog(LOG_LEVEL_INFO, PLUGIN_LOG_PREFIX_154 + F("EXIT PLUGIN_154"));
+         String log = PLUGIN_LOG_PREFIX_154;
+         log += F("EXIT PLUGIN_154");
+         addLogMove(LOG_LEVEL_INFO, log);
          clearPluginTaskData(event->TaskIndex); // clear plugin taskdata
          success = true;
          break;
@@ -122,10 +128,12 @@ boolean Plugin_154(byte function, struct EventStruct *event, String& string){
 
 
 		case PLUGIN_INIT:{
-            if(!Plugin_154_init && !ventilation_gateway_disable_serial){
-               Serial.begin(115200, SERIAL_8N1);
-            }
-         addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_154 + F("Init plugin done."));
+         if(!Plugin_154_init && !ventilation_gateway_disable_serial){
+            Serial.begin(115200, SERIAL_8N1);
+         }
+         String log = PLUGIN_LOG_PREFIX_154;
+         log += F("Init plugin done.");
+         addLogMove(LOG_LEVEL_INFO, log);
          Plugin_154_init = true;
          P154_waitingForSerialPort[event->TaskIndex] = false;
 			success = true;
@@ -134,15 +142,19 @@ boolean Plugin_154(byte function, struct EventStruct *event, String& string){
 
       case PLUGIN_READ:{
         	if (Plugin_154_init && (PCONFIG(P154_CONFIG_NODE_ADDRESS) != 0) && !ventilation_gateway_disable_serial){
-
-            addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_154 + F("start read, eventid:") +event->TaskIndex);
-
+            String log = PLUGIN_LOG_PREFIX_154;
+            log += F("start read, eventid:");
+            log += event->TaskIndex;
+            addLogMove(LOG_LEVEL_DEBUG, log);
 
 	         // check if serial port is in use by another task, otherwise set flag.
 			   if(serialPortInUseByTask == 255){
 				   serialPortInUseByTask = event->TaskIndex;
 
-               addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_154 + F("Read external CO2 sensor."));
+               log = PLUGIN_LOG_PREFIX_154;
+               log += F("Read external CO2 sensor.");
+               addLogMove(LOG_LEVEL_DEBUG, log);
+
                if(PCONFIG(P154_CONFIG_DEVICE) == P154_DUCO_DEVICE_CO2){
                   startReadExternalSensors(PLUGIN_LOG_PREFIX_154, DUCO_DATA_EXT_SENSOR_CO2_PPM, PCONFIG(P154_CONFIG_NODE_ADDRESS));
                }else if(PCONFIG(P154_CONFIG_DEVICE) == P154_DUCO_DEVICE_CO2_TEMP){
@@ -154,7 +166,12 @@ boolean Plugin_154(byte function, struct EventStruct *event, String& string){
             }else{
                char serialPortInUse[40];
                snprintf(serialPortInUse, sizeof(serialPortInUse)," %u, set flag to read data later.", serialPortInUseByTask);
-	            addLog(LOG_LEVEL_DEBUG,PLUGIN_LOG_PREFIX_154 + F("Serial port in use by taskid") + serialPortInUse );
+               log = PLUGIN_LOG_PREFIX_154;
+               log += F("Serial port in use by taskid");
+               log += serialPortInUse;
+               addLogMove(LOG_LEVEL_DEBUG, log);
+
+
                P154_waitingForSerialPort[event->TaskIndex] = true;
 
 			   }
@@ -177,7 +194,10 @@ boolean Plugin_154(byte function, struct EventStruct *event, String& string){
 
             if(serialPortInUseByTask == event->TaskIndex){
                if( (millis() - ducoSerialStartReading) > PLUGIN_READ_TIMEOUT_154){
-                  addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_154 + F("Serial reading timeout"));
+                  String log = PLUGIN_LOG_PREFIX_154;
+                  log += F("Serial reading timeout");
+                  addLogMove(LOG_LEVEL_DEBUG, log);
+
                   DucoTaskStopSerial(PLUGIN_LOG_PREFIX_154);
                }
             }
@@ -266,7 +286,9 @@ void startReadExternalSensors(String logPrefix, uint8_t dataType, int nodeAddres
 	}
 
    snprintf(logBuf, sizeof(logBuf), "Start read external sensor. NodeAddress: %u. Type: %s", nodeAddress, dataTypeName);
-	addLog(LOG_LEVEL_INFO, logPrefix + logBuf );
+   String log = PLUGIN_LOG_PREFIX_154;
+   log += logBuf;
+   addLogMove(LOG_LEVEL_INFO, log);
 
    // set this variables before sending command
 	ducoSerialStartReading = millis();
@@ -283,7 +305,7 @@ void startReadExternalSensors(String logPrefix, uint8_t dataType, int nodeAddres
 
 	// if succesfully send command then receive response
 	if (!commandSendResult) {
-      addLog(LOG_LEVEL_ERROR, logPrefix + F("Failed to send commando to Ducobox"));
+      addLogMove(LOG_LEVEL_ERROR, logPrefix + F("Failed to send commando to Ducobox"));
       DucoTaskStopSerial(logPrefix);
    }
    */
@@ -312,11 +334,16 @@ void startReadExternalSensors(String logPrefix, uint8_t dataType, int nodeAddres
 void readExternalSensorsProcessRow(String logPrefix, uint8_t userVarIndex, uint8_t dataType, int nodeAddress, bool serialLoggingEnabled){
     // get the first row to check for command, skip row 2 & 3, get row 4 (columnnames)
 
-
-      if(serialLoggingEnabled){	     
-         addLog(LOG_LEVEL_DEBUG, logPrefix + F("ROW:") + (duco_serial_rowCounter) + F(" bytes:") + duco_serial_bytes_read);
-         DucoSerialLogArray(logPrefix, duco_serial_buf, duco_serial_bytes_read, 0);
-      }
+   String log;
+   if(serialLoggingEnabled){	     
+      log = logPrefix;
+      log += F("ROW: ");
+      log += duco_serial_rowCounter;
+      log += F(" bytes read:");
+      log += duco_serial_bytes_read;
+      addLogMove(LOG_LEVEL_DEBUG, log);     
+      DucoSerialLogArray(logPrefix, duco_serial_buf, duco_serial_bytes_read, 0);
+   }
 
 	if(duco_serial_rowCounter == 1){
       uint8_t parameter;
@@ -332,9 +359,13 @@ void readExternalSensorsProcessRow(String logPrefix, uint8_t userVarIndex, uint8
       snprintf_P(command, sizeof(command), "nodeparaget %d %d", nodeAddress, parameter);
 
 		if (DucoSerialCheckCommandInResponse(logPrefix, command) ) {
-     		addLog(LOG_LEVEL_DEBUG, logPrefix + F("Command confirmed by ducobox"));
+        	log = logPrefix;
+			log += F("Command confirmed by ducobox");
+         addLogMove(LOG_LEVEL_DEBUG, log);
       } else {
-         addLog(LOG_LEVEL_ERROR, logPrefix + F("Received invalid response"));
+         log = logPrefix;
+			log += F("Received invalid response");
+         addLogMove(LOG_LEVEL_DEBUG, log);
 			DucoTaskStopSerial(logPrefix);
          return;
       }
@@ -363,7 +394,9 @@ void readExternalSensorsProcessRow(String logPrefix, uint8_t userVarIndex, uint8
             UserVar[userVarIndex] = rh;
             snprintf(logBuf, sizeof(logBuf), "RH: %u = %.2f%%", raw_value, rh);
          }
-         addLog(LOG_LEVEL_INFO, logPrefix + logBuf);
+         log = logPrefix;
+			log += logBuf;
+         addLogMove(LOG_LEVEL_DEBUG, log);
       }
    } 
 } // end of readExternalSensors()

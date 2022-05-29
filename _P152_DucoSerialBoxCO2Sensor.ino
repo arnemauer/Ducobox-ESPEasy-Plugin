@@ -6,6 +6,10 @@
 //  http://arnemauer.nl/ducobox-gateway/
 //#######################################################################################################
 
+#include "_Plugin_Helper.h"
+#include "DucoSerialHelpers.h"
+
+
 #define PLUGIN_152
 #define PLUGIN_ID_152           152
 #define PLUGIN_NAME_152         "DUCO Serial GW - Box Sensor - CO2"
@@ -95,17 +99,23 @@ boolean Plugin_152(byte function, struct EventStruct *event, String& string)
 
 	case PLUGIN_READ: {
    	if (Plugin_152_init && !ventilation_gateway_disable_serial){
-
-         addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_152 + F("start read, eventid:") +event->TaskIndex);
-
+         String log;
+         log = PLUGIN_LOG_PREFIX_152;
+         log += F("start read, eventid:");
+         log += event->TaskIndex;
+         addLogMove(LOG_LEVEL_DEBUG, log);
 
          // check if serial port is in use by another task, otherwise set flag.
 			if(serialPortInUseByTask == 255){
 				serialPortInUseByTask = event->TaskIndex;
-            addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_152 + F("Start readBoxSensors"));
+            log = PLUGIN_LOG_PREFIX_152;
+            log += F("Start readBoxSensors");
+            addLogMove(LOG_LEVEL_DEBUG, log);
             startReadBoxSensors(PLUGIN_LOG_PREFIX_152);
          }else{
-				addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_152 + F("Serial port in use, set flag to read data later."));
+            log = PLUGIN_LOG_PREFIX_152;
+            log += F("Serial port in use, set flag to read data later.");
+            addLogMove(LOG_LEVEL_DEBUG, log);
 				P152_waitingForSerialPort = true;
 			}
       
@@ -126,7 +136,11 @@ boolean Plugin_152(byte function, struct EventStruct *event, String& string)
 
          if(serialPortInUseByTask == event->TaskIndex){
             if( (millis() - ducoSerialStartReading) > PLUGIN_READ_TIMEOUT_152){
-               addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_152 + F("Serial reading timeout"));
+               String log;
+               log = PLUGIN_LOG_PREFIX_152;
+               log += F("Serial reading timeout");
+               addLogMove(LOG_LEVEL_DEBUG, log);
+
                DucoTaskStopSerial(PLUGIN_LOG_PREFIX_152);
                serialPortInUseByTask = 255;
             }
@@ -214,7 +228,7 @@ void startReadBoxSensors(String logPrefix){
    char command[] = "sensorinfo\r\n";
    int commandSendResult = DucoSerialSendCommand(logPrefix, command);
    if (!commandSendResult) {
-      addLog(LOG_LEVEL_ERROR, logPrefix + F("Failed to send commando to Ducobox"));
+      addLogMove(LOG_LEVEL_ERROR, logPrefix + F("Failed to send commando to Ducobox"));
       DucoTaskStopSerial(logPrefix);
    }
    */
@@ -235,18 +249,28 @@ sensorinfo
   TEMP - SHT21 :  174 [.1°C] (0)
    */
 void readBoxSensorsProcessRow( String logPrefix, uint8_t sensorDeviceType, uint8_t userVarIndex, bool serialLoggingEnabled){
-   
+      String log;
       if(serialLoggingEnabled){	     
-         addLog(LOG_LEVEL_DEBUG, logPrefix + F("ROW:") + (duco_serial_rowCounter) + F(" bytes:") + duco_serial_bytes_read);
+         
+			log = logPrefix;
+			log += F("ROW: ");
+			log += duco_serial_rowCounter;
+			log += F(" bytes read:");
+			log += duco_serial_bytes_read;
+         addLogMove(LOG_LEVEL_DEBUG, log);
          DucoSerialLogArray(logPrefix, duco_serial_buf, duco_serial_bytes_read, 0);
       }
 
     // get the first row to check for command
 	if( duco_serial_rowCounter == 1){
 		if (DucoSerialCheckCommandInResponse(logPrefix, "sensorinfo") ) {
-     		addLog(LOG_LEVEL_DEBUG, logPrefix + F("Received correct response on sensorinfo"));
+      	log = logPrefix;
+			log += F("Received correct response on sensorinfo");
+         addLogMove(LOG_LEVEL_DEBUG, log);
       } else {
-         addLog(LOG_LEVEL_ERROR, logPrefix + F("Received invalid response"));
+         log = logPrefix;
+			log += F("Received invalid response");
+         addLogMove(LOG_LEVEL_DEBUG, log);
 			DucoTaskStopSerial(logPrefix);
          return;
       }
@@ -264,7 +288,9 @@ void readBoxSensorsProcessRow( String logPrefix, uint8_t sensorDeviceType, uint8
                   unsigned int co2_ppm = raw_value; /* No conversion required */
                   UserVar[userVarIndex] = co2_ppm;
                   snprintf(logBuf, sizeof(logBuf), "CO2 PPM: %u = %u PPM", raw_value, co2_ppm);
-                  addLog(LOG_LEVEL_DEBUG, logPrefix + logBuf);
+                  log = logPrefix;
+                  log += logBuf;
+                  addLogMove(LOG_LEVEL_DEBUG, log);
                }
             }
         }
@@ -278,7 +304,9 @@ void readBoxSensorsProcessRow( String logPrefix, uint8_t sensorDeviceType, uint8
                   float rh = (float) raw_value / 100.;
                   UserVar[userVarIndex + 1] = rh;
                   snprintf(logBuf, sizeof(logBuf), "RH: %u = %.2f%%", raw_value, rh);
-                  addLog(LOG_LEVEL_DEBUG, logPrefix + logBuf);
+                  log = logPrefix;
+                  log += logBuf;
+                  addLogMove(LOG_LEVEL_DEBUG, log);
                }
             }
          }
@@ -286,14 +314,18 @@ void readBoxSensorsProcessRow( String logPrefix, uint8_t sensorDeviceType, uint8
 
 		if(sensorDeviceType == P152_DUCO_DEVICE_CO2_TEMP || sensorDeviceType == P152_DUCO_DEVICE_RH){
          if (strlen("  TEMP") <= duco_serial_bytes_read && strncmp("  TEMP", (char*) duco_serial_buf, strlen("  TEMP")) == 0) {
-            addLog(LOG_LEVEL_DEBUG, logPrefix + "row starts with TEMP");
+            log = logPrefix;
+            log += F("row starts with TEMP");
+            addLogMove(LOG_LEVEL_DEBUG, log);
             char* startByteValue = strchr((char*) duco_serial_buf,':');
             if(startByteValue != NULL ){
                if (sscanf((const char*)startByteValue, ": %u", &raw_value) == 1) {
                   float temp = (float) raw_value / 10.;
                   UserVar[userVarIndex] = temp;
                   snprintf(logBuf, sizeof(logBuf), "TEMP: %u = %.1fÂ°C", raw_value, temp);
-                  addLog(LOG_LEVEL_DEBUG, logPrefix + logBuf);
+                  log = logPrefix;
+                  log += logBuf;
+                  addLogMove(LOG_LEVEL_DEBUG, log);
                }
             }
          }

@@ -11,15 +11,15 @@
 // default constructor
 DucoCC1101::DucoCC1101(uint8_t counter, uint8_t sendTries) : CC1101()
 {
-	this->outDucoPacket.counter = counter;
+	//this->outDucoPacket.counter = counter;
 	this->sendTries = sendTries;
 	this->deviceAddress = 0;
 	this->radioPower = 0xC1; // default radio power 0xC1 = 10,3dBm @ 868mhz
-	this->waitingForAck = 0; 
-	this->ackTimer = 0;
-	this->ackRetry = 0;
+	//this->waitingForAck = 0; 
+	//this->ackTimer = 0;
+	//this->ackRetry = 0;
 
-	this->testCounter = 0; // temp 
+	//this->testCounter = 0; // temp 
 	
 	this->messageCounter = 1; // for messages out NEVER ZERO!
 	//this->lastRssiByte = 0;
@@ -40,16 +40,37 @@ void DucoCC1101::setLogMessage(const __FlashStringHelper* flashString)
     String s(flashString);
     setLogMessage(s.c_str());
 }
-
+/*
 void DucoCC1101::setLogMessage(const char *newLogMessage){
-	snprintf(logMessages[this->numberOfLogmessages], sizeof(logMessages[this->numberOfLogmessages]), "%lu - %s", millis(), newLogMessage);
 
-	if(this->numberOfLogmessages == NUMBER_OF_LOG_STRING){
-		this->numberOfLogmessages = 0;
-	}else{
+	if(this->numberOfLogmessages < (NUMBER_OF_LOG_STRING -1) ){
+		snprintf(logMessages[this->numberOfLogmessages], sizeof(logMessages[this->numberOfLogmessages]), "%u - %s", numberOfLogmessages, newLogMessage);
+		//	snprintf(logMessages[this->numberOfLogmessages], sizeof(logMessages[this->numberOfLogmessages]), "%lu - %s", millis(), newLogMessage);
 		this->numberOfLogmessages++;
+	}else{
+		//snprintf(logMessages[(NUMBER_OF_LOG_STRING -1)], sizeof(logMessages[(NUMBER_OF_LOG_STRING -1)]), F("LogMessage buffer is full! New log messages are not logged!"));
+		
+		//strncpy (logMessages[(NUMBER_OF_LOG_STRING -1)] , "LogMessage buffer is full! New log messages are not logged!", sizeof(logMessages[(NUMBER_OF_LOG_STRING -1)]));
+		//this->numberOfLogmessages = 0;
+		//snprintf(logMessages[(NUMBER_OF_LOG_STRING -1)], sizeof(logMessages[(NUMBER_OF_LOG_STRING -1)]), "%s", "LogMessage buffer is full! New log messages are not logged!");
+
 	}
 }
+*/
+
+void DucoCC1101::setLogMessage(const char *newLogMessage){
+//	snprintf(logMessages[this->numberOfLogmessages], sizeof(logMessages[this->numberOfLogmessages]), "%lu - %s", millis(), newLogMessage);
+
+	if(this->numberOfLogmessages < (NUMBER_OF_LOG_STRING) ){
+		snprintf(logMessages[this->numberOfLogmessages], sizeof(logMessages[this->numberOfLogmessages]), "%u - %s", this->numberOfLogmessages, newLogMessage);
+		this->numberOfLogmessages++;
+	}else{
+		char fullLog[] = "LogMessage buffer is full! New log messages are not logged!";
+		snprintf(logMessages[(NUMBER_OF_LOG_STRING -1)], sizeof(logMessages[(NUMBER_OF_LOG_STRING -1)]), "%s", fullLog);
+	}
+}
+
+
 
 uint8_t DucoCC1101::getNumberOfLogMessages(){
 	uint8_t tempNumber = this->numberOfLogmessages;
@@ -90,9 +111,12 @@ void DucoCC1101::initReceive()
 
 	writeRegister(CC1101_IOCFG0 ,0x2E);	//!!! 	//High impedance (3-state)
 	writeRegister(CC1101_IOCFG1 ,0x2E);	//!!    //High impedance (3-state)
-	//writeRegister(CC1101_IOCFG2 ,0x07);	//!!! duco 0x07= Asserts when a packet has been received with CRC OK. De-asserts when the first byte is read from the RX FIFO.
+	writeRegister(CC1101_IOCFG2 ,0x07);	//!!! duco 0x07= Asserts when a packet has been received with CRC OK. De-asserts when the first byte is read from the RX FIFO.
 	
-	writeRegister(CC1101_IOCFG2 ,0x06);	
+	
+	//writeRegister(CC1101_IOCFG2 ,0x06);	
+
+
 	/* 6 (0x06) = Asserts when sync word has been sent / received, and de-asserts at the end of the packet. 
 	=> In RX, the pin will also deassert when a packet is discarded due to address or maximum length filtering 
       or when the radio enters RXFIFO_OVERFLOW state. 
@@ -103,12 +127,16 @@ void DucoCC1101::initReceive()
 	      =>> TODO: disable interrupt
 	*/
 
-	writeRegister(CC1101_FIFOTHR, 0x07); // default value. FIFO treshold TX=33;RX=32
+	writeRegister(CC1101_FIFOTHR, 0x47); //  ADC_RETENTION =1; FIFO treshold TX 33 bytes / RX 32 bytes
 	writeRegister(CC1101_SYNC1 ,0xD3);	//duco 0xD3 /   		//message2 byte6
 	writeRegister(CC1101_SYNC0 ,0x91);	//duco 0x91	/  	//message2 byte7
 
-	writeRegister(CC1101_PKTLEN ,0x20); // duco 0x20 / maximum packet size is 32 bytes, The packet length is defined as the 
+	writeRegister(CC1101_PKTLEN ,0x3D); // duco 0x20 / maximum packet size is 32 bytes, The packet length is defined as the 
 										// payload data, excluding the length byte and the optional CRC.
+
+										// CC1101 Silicon Errata (Rev. E) - https://www.ti.com/lit/er/swrz020e/swrz020e.pdf?ts=1650659256454
+										// RXFIFO_OVERFLOW Issue Radio stays in RX state instead of entering RXFIFO_OVERFLOW state
+										// 61 (dec) = 0x3D (hex)
 
 	/* In variable packet length mode, PKTCTRL0.LENGTH_CONFIG=1, the packet length is configured by the first byte after the
 sync word. The packet length is defined as the payload data, excluding the length byte and the optional CRC. The PKTLEN register is
@@ -126,12 +154,12 @@ used to set the maximum packet length allowed in RX. Any packet received with a 
 
 	writeRegister(CC1101_FREQ2 ,0x21); // duco/
 	writeRegister(CC1101_FREQ1 ,0x65); // duco/
-	writeRegister(CC1101_FREQ0 ,0x5C); //  0x6A / duco: 0x5C
+	writeRegister(CC1101_FREQ0 ,0x57); // ducobox: 0x5C - freq = 868.294312  //  CO2/humidity sensors: 0x57 - freq=868.292358
 
 	writeRegister(CC1101_MDMCFG4 ,0xCA); // duco 0xCA   / 0xE8 
 	writeRegister(CC1101_MDMCFG3 ,0x83); // duco 0x83   / 0x43 
 	writeRegister(CC1101_MDMCFG2 ,0x13); // duco 0x13   / 0x00 		//Enable digital DC blocking filter before demodulator, GFSK, Disable Manchester encoding/decoding, No preamble/sync 
-	writeRegister(CC1101_MDMCFG1 ,0x22); // duco/		//Disable FEC
+	writeRegister(CC1101_MDMCFG1 ,0x22); // duco/		//Disable FEC (FEC_EN)
 	writeRegister(CC1101_MDMCFG0 ,0xF8); // duco/ channel spacing = 199.951 kHz
 	
 	writeRegister(CC1101_DEVIATN ,0x35); // duco 0x35   / 0x40 
@@ -146,6 +174,8 @@ used to set the maximum packet length allowed in RX. Any packet received with a 
 	writeRegister(CC1101_AGCCTRL1 ,0x40); // duco/
 	writeRegister(CC1101_AGCCTRL0 ,0x91); // duco/
 
+	writeRegister(CC1101_WORCTRL ,0xFB); // duco/
+
 	writeRegister(CC1101_FREND1 ,0x56); // duco/ 0x56
 	writeRegister(CC1101_FREND0 ,0x10); // duco 0x10   / 0x17
 
@@ -156,6 +186,7 @@ used to set the maximum packet length allowed in RX. Any packet received with a 
 	writeRegister(CC1101_FSCAL0 ,0x1F); // duco/
 
 	writeRegister(CC1101_FSTEST ,0x59); // duco/
+	writeRegister(CC1101_AGCTEST ,0x3F); // duco/
 	writeRegister(CC1101_TEST2 ,0x81); // duco/
 	writeRegister(CC1101_TEST1 ,0x35); // duco/
 	writeRegister(CC1101_TEST0 ,0x09); // duco 0x09 / 0x0B
@@ -226,7 +257,7 @@ void DucoCC1101::sendDataToDuco(CC1101Packet *packet, uint8_t outboxQMessageNumb
 		setLogMessage(bigLogBuf);
 		memset(bigLogBuf, 0, sizeof(bigLogBuf)); // reset char bigLogBuf
 
-		arrayToString(packet->data, min(static_cast<uint>(packet->length),sizeof(bigLogBuf)) , bigLogBuf);
+		arrayToString(packet->data, min<unsigned int>(packet->length,sizeof(bigLogBuf)) , bigLogBuf);
 		setLogMessage(bigLogBuf);
 	}
 	// DEBUG
@@ -238,6 +269,14 @@ void DucoCC1101::sendDataToDuco(CC1101Packet *packet, uint8_t outboxQMessageNumb
 	
 }
 
+
+
+bool DucoCC1101::checkAndResetRxFifoOverflow(){
+	//bool fifoOverflow = false;
+	//bool fifoOverflow = checkForRxFifoOverFlow();
+	//return fifoOverflow;
+	return checkForRxFifoOverFlow();
+}
 
 
 bool DucoCC1101::pollNewDeviceAddress(){
@@ -332,7 +371,7 @@ bool DucoCC1101::checkForNewPacket()
 			return false;
 		}
 
-		inboxQ[messageNumber].time_received_message = millis();
+		inboxQ[messageNumber].timeReceivedMessage = millis();
 		inboxQ[messageNumber].messageProcessed = false;
 
 		// reset dataLength
@@ -391,7 +430,7 @@ void DucoCC1101::processMessage(uint8_t inboxQMessageNumber)
 			memset(bigLogBuf, 0, sizeof(bigLogBuf)); // reset char bigLogBuf
 
 			//log received bytes 
-			arrayToString(inboxQ[inboxQMessageNumber].packet.data, min(static_cast<uint>(inboxQ[inboxQMessageNumber].packet.dataLength),sizeof(bigLogBuf)) , bigLogBuf);
+			arrayToString(inboxQ[inboxQMessageNumber].packet.data, min<unsigned int>(inboxQ[inboxQMessageNumber].packet.dataLength,sizeof(bigLogBuf)) , bigLogBuf);
 			setLogMessage(bigLogBuf);
 		}
 
@@ -612,12 +651,12 @@ void DucoCC1101::processNetworkPacket(uint8_t inboxQMessageNumber){
 	
 	// copy data from incoming network package 
 	outboxQ[outboxQMessageNumber].packet.data[0] = inboxQ[inboxQMessageNumber].packet.data[0]; 
-	outboxQ[outboxQMessageNumber].packet.dataLength++;
+	outboxQ[outboxQMessageNumber].packet.dataLength = 1; // no commandLength bytes in this packet
  	outboxQ[outboxQMessageNumber].packet.messageType = ducomsg_network;
 
- 	prefillDucoPacket(&outboxQ[outboxQMessageNumber].packet, 0x00, inDucoPacket.originalSourceAddress, inDucoPacket.originalDestinationAddress); 
+ 	prefillDucoPacket(&outboxQ[outboxQMessageNumber].packet, 0x00, inboxQ[inboxQMessageNumber].packet.originalSourceAddress, inboxQ[inboxQMessageNumber].packet.originalDestinationAddress); 
 
-	outboxQ[outboxQMessageNumber].packet.counter = inDucoPacket.counter;
+	outboxQ[outboxQMessageNumber].packet.counter = inboxQ[inboxQMessageNumber].packet.counter;
 	ducoToCC1101Packet(&outboxQ[outboxQMessageNumber].packet, &outMessage);
 
 	// packet 9 = footer, needs to be rssi value. 	// after receiving a networkpacket, each node repeats the network packet with RSSI value
@@ -898,9 +937,9 @@ void DucoCC1101::checkForAck(){
 		if(outboxQ[outboxQMessageNumber].hasSent == true){
 			//  if waitForAck = true AND AckReceived = false
 			if( (outboxQ[outboxQMessageNumber].waitForAck == true && outboxQ[outboxQMessageNumber].ackReceived == false) ){
-				char bigLogBuf[106]; // max 106!
-		     	snprintf(bigLogBuf, sizeof(bigLogBuf), "CheckforAck: message Q%u hassent:%u; waitforack:%u;ackreceived:%u; timer: %lu; sendTries: %u ",outboxQMessageNumber, outboxQ[outboxQMessageNumber].hasSent, outboxQ[outboxQMessageNumber].waitForAck, outboxQ[outboxQMessageNumber].ackReceived, outboxQ[outboxQMessageNumber].ackTimer, outboxQ[outboxQMessageNumber].sendRetries);
-				setLogMessage(bigLogBuf);
+				//char bigLogBuf[106]; // max 106!
+		     	//snprintf(bigLogBuf, sizeof(bigLogBuf), "CheckforAck: message Q%u hassent:%u; waitforack:%u;ackreceived:%u; timer: %lu; sendTries: %u ",outboxQMessageNumber, outboxQ[outboxQMessageNumber].hasSent, outboxQ[outboxQMessageNumber].waitForAck, outboxQ[outboxQMessageNumber].ackReceived, outboxQ[outboxQMessageNumber].ackTimer, outboxQ[outboxQMessageNumber].sendRetries);
+				//setLogMessage(bigLogBuf);
 
 
 				unsigned long mill = millis();
@@ -946,8 +985,25 @@ bool DucoCC1101::matchingDeviceAddress(uint8_t compDeviceAddress){
 	}
 }
 
+
+void DucoCC1101::setGatewayAddress(uint8_t deviceAddress){
+	this->deviceAddress = deviceAddress; 
+}
  
 
+//networkid
+void DucoCC1101::setNetworkId(uint8_t newNetworkId[4]){ 
+	memcpy(this->networkId, newNetworkId, 4);
+}
+
+void DucoCC1101::setLogRFMessages(bool logRFMessages){ 
+	this->logRFMessages = logRFMessages; 
+}
+
+//get/set radio power
+void DucoCC1101::setRadioPower(uint8_t radioPower){ 
+	this->radioPower = radioPower; 
+}
 
 bool DucoCC1101::checkForNewPacketInRXFifo(){
 	uint8_t rxBytes = readRegisterWithSyncProblem(CC1101_RXBYTES, CC1101_STATUS_REGISTER);
@@ -1034,7 +1090,7 @@ void DucoCC1101::parseMessageCommand(uint8_t inboxQMessageNumber)
 
 				case 0x36: // 0x36 = wachten op aanmelden roosters/kleppen
 					setLogMessage(F("Received waitcommand for joining electronic window vents."));
-					sendPing(outboxQMessageNumber, commandNumber, startByteNextCommand);
+
 					commandWaitForAck = true;
 				break;
 
@@ -1283,7 +1339,7 @@ void DucoCC1101::sendNodeParameterValue(uint8_t outboxQMessageNumber, uint8_t in
 
 	setCommandLength(&outboxQ[outboxQMessageNumber].packet, commandNumber, 5); // set commandlength first command, command (1byte) + parameter (2 bytes) + 2 value bytes = 5 bytes.
 
-	if((outboxQ[outboxQMessageNumber].packet.dataLength +5) > sizeof(outboxQ[outboxQMessageNumber].packet.data) ){
+	if((unsigned long)outboxQ[outboxQMessageNumber].packet.dataLength +5 > sizeof(outboxQ[outboxQMessageNumber].packet.data) ){
 		setLogMessage(F("Buffer overflow: not enough space to store all bytes from parameter in outboxQMessage."));
 	} else{
 		outboxQ[outboxQMessageNumber].packet.data[outboxQ[outboxQMessageNumber].packet.dataLength++] = 0x41; 			// byte 1: commando "response opvragen parameter"
@@ -1298,17 +1354,6 @@ void DucoCC1101::sendNodeParameterValue(uint8_t outboxQMessageNumber, uint8_t in
 	}
 }
 
-
-
-void DucoCC1101::sendPing(uint8_t outboxQMessageNumber, uint8_t commandNumber, uint8_t startByteCommand){
-	
-	outDucoPacket.messageType = ducomsg_message;
-
-	setCommandLength(&outDucoPacket, commandNumber, 1); // set commandlength first command, 1 byte.
-
-	outDucoPacket.data[ ++outDucoPacket.dataLength  ] = (inDucoPacket.data[startByteCommand] +1); // get first data byte of ping command, add 1, 
-	setLogMessage(F("SEND PING done!"));
-}
 
 
 
@@ -1390,7 +1435,7 @@ uint8_t DucoCC1101::getCommandLength(uint8_t commandLengthByte1, uint8_t command
 
 	if(commandNumber == 0){
 		return (commandLengthByte1 >> 4);
-	}else if(commandNumber == 1){
+	}else{ //} if(commandNumber == 1){
 		return (commandLengthByte1 & 0b00001111);
 	}
 }
@@ -1433,20 +1478,43 @@ bool DucoCC1101::processNewVentilationMode(uint8_t inboxQMessageNumber, uint8_t 
 	uint8_t newVentilationMode = 0x00;
 	bool newPermanentVentilationMode; 
 
-	char logBuf[35];
-	snprintf(logBuf, sizeof(logBuf), "processNewVentilationMode: %02x %02x", inboxQ[inboxQMessageNumber].packet.data[ (startByteCommand +1)],  (inboxQ[inboxQMessageNumber].packet.data[ (startByteCommand +1) ] & 0b00000111));
-	setLogMessage(logBuf);
- 
+
 	// check for valid ventilationmode (0-4)
 	if( (inboxQ[inboxQMessageNumber].packet.data[ (startByteCommand +1) ] & 0b00000111) <= 7){
 		newVentilationMode = (inboxQ[inboxQMessageNumber].packet.data[ (startByteCommand +1) ] & 0b00000111);
 		newPermanentVentilationMode = (inboxQ[inboxQMessageNumber].packet.data[ (startByteCommand +1) ] & 0b00001000);
-		if(this->currentVentilationMode != newVentilationMode || this->permanentVentilationMode != newPermanentVentilationMode){
+
+/*
+		char logBuf[50];
+		snprintf(logBuf, sizeof(logBuf), "processNewVentilationMode: %02x-%02x; %02x-%02x;", this->currentVentilationMode, newVentilationMode,this->permanentVentilationMode, newPermanentVentilationMode);
+		setLogMessage(logBuf);
+/*
+		if( (this->currentVentilationMode != newVentilationMode)){
+			setLogMessage(F("CUR ventilationMode changed!"));
+		}
+		
+		if((this->permanentVentilationMode != newPermanentVentilationMode)){
+			setLogMessage(F("PERM ventilationMode changed!"));
+		}
+*/
+		if( (this->currentVentilationMode != newVentilationMode) || (this->permanentVentilationMode != newPermanentVentilationMode) ){
+			setLogMessage(F("ventilationMode changed!"));
 			this->currentVentilationMode = newVentilationMode;
 			this->permanentVentilationMode = newPermanentVentilationMode;
+			//if(this->currentVentilationMode == 0x05){
+		//		this->currentVentilationMode = 0x04;
+		//	}else{
+		//		this->currentVentilationMode = 0x05;
+		//	}
+			//this->permanentVentilationMode = true;
 			return true;
 		}
+		
+
 	}
+	
+
+
 	return false;
 }
 
@@ -1629,6 +1697,11 @@ void DucoCC1101::TEST_GDOTest(){
 	writeRegister(CC1101_IOCFG2 ,0x3F);	// 135-141 kHz clock output (XOSC frequency divided by 192).
 }
 
+
+uint8_t DucoCC1101::TEST_getRxBytes(){
+	uint8_t rxBytes = getRxBytes();
+	return rxBytes;
+}
 
 
 void DucoCC1101::sendTestMessage(){
