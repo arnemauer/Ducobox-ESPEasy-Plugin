@@ -20,10 +20,10 @@ TODO:
 #include "DucoPacket.h"
 
 //This extra settings struct is needed because the default settingsstruct doesn't support strings
-struct PLUGIN_150_ExtraSettingsStruct
-{	uint8_t networkId[4];
-} PLUGIN_150_ExtraSettings;
-
+//struct PLUGIN_150_ExtraSettingsStruct
+//{	
+	uint8_t Plugin_150_NetworkId[4];
+//} PLUGIN_150_ExtraSettings;
 DucoCC1101 PLUGIN_150_rf;
 
 // extra for interrupt handling
@@ -46,6 +46,8 @@ typedef enum {
     P150_CONFIG_LOG_RF = 1,
 	P150_CONFIG_RADIO_POWER = 2,
 	P150_CONFIG_HARDWARE_TYPE = 3,
+	P150_CONFIG_NETWORKID_BYTE_1_2 = 4,
+	P150_CONFIG_NETWORKID_BYTE_3_4 = 5,
 } P150PluginConfigs;
 
 
@@ -145,6 +147,8 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
     	success = true;
     	break;
   	}
+			PCONFIG(P150_CONFIG_NETWORKID_BYTE_1_2) = 0;
+			PCONFIG(P150_CONFIG_NETWORKID_BYTE_3_4) = 0;
   		
 		case PLUGIN_INIT: {
 		
@@ -167,6 +171,11 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 					addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_150 + F("IO-PIN changed, deatachinterrupt old pin"));
 					detachInterrupt(Plugin_150_IRQ_pin);
 				}
+					Plugin_150_NetworkId[0] = (PCONFIG(P150_CONFIG_NETWORKID_BYTE_1_2) >> 8);
+					Plugin_150_NetworkId[1] = (PCONFIG(P150_CONFIG_NETWORKID_BYTE_1_2) & 0xff);
+					Plugin_150_NetworkId[2] = (PCONFIG(P150_CONFIG_NETWORKID_BYTE_3_4) >> 8);
+					Plugin_150_NetworkId[3] = (PCONFIG(P150_CONFIG_NETWORKID_BYTE_3_4) & 0xff);
+					PLUGIN_150_rf.setNetworkId(Plugin_150_NetworkId);
 
 			
 
@@ -174,7 +183,6 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 				PLUGIN_150_rf.setLogRFMessages(PCONFIG(P150_CONFIG_LOG_RF));
 				PLUGIN_150_rf.init();
 				PLUGIN_150_rf.setDeviceAddress(PCONFIG(P150_CONFIG_DEVICE_ADDRESS));
-				PLUGIN_150_rf.setNetworkId(PLUGIN_150_ExtraSettings.networkId);
 				PLUGIN_150_rf.setRadioPower(P150_radio_power_value[PCONFIG(P150_CONFIG_RADIO_POWER)]);
 				PLUGIN_150_rf.setTemperature(210); // = 21.0 C
 								
@@ -579,25 +587,23 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 			}
 			addSelector_Foot();
 
-
 			addFormSubHeader(F("Remote RF Controls (automaticly filled after succesfull join)"));
 			char tempNetworkId [9];
 			char tempBuffer[20];
-
-			LoadCustomTaskSettings(event->TaskIndex, (byte*)&PLUGIN_150_ExtraSettings, sizeof(PLUGIN_150_ExtraSettings));
+			char tempByte[4];
+			tempByte[0] = PCONFIG(P150_CONFIG_NETWORKID_BYTE_1_2) >> 8;
+			tempByte[1] = PCONFIG(P150_CONFIG_NETWORKID_BYTE_1_2) & 0xff;
+			tempByte[2] = PCONFIG(P150_CONFIG_NETWORKID_BYTE_3_4) >> 8;
+			tempByte[3] = PCONFIG(P150_CONFIG_NETWORKID_BYTE_3_4) & 0xff;
 
 			for(int i=0; i<=3; i++){    // start with lowest byte of number
-				sprintf(&tempBuffer[0],"%02X",PLUGIN_150_ExtraSettings.networkId[i]); //converts to hexadecimal base.
+				sprintf(&tempBuffer[0],"%02X", tempByte[i]); //converts to hexadecimal base.
 				tempNetworkId[(i*2)] = tempBuffer[0];
 				tempNetworkId[(i*2)+1] = tempBuffer[1];
 			}
 			tempNetworkId[8] = '\0';
-			addFormTextBox( F("Network ID (HEX)"), F("PLUGIN_150_NETWORKID"), tempNetworkId, 8);
-
-			char tempDeviceAddress[3];
-			sprintf(&tempDeviceAddress[0],"%d", PCONFIG(P150_CONFIG_DEVICE_ADDRESS));
-
-			addFormTextBox( F("Device Address"), F("PLUGIN_150_DEVICEADDRESS"), tempDeviceAddress, 3);
+			addFormTextBox( F("Network ID (HEX)"), F("p150_network_id"), tempNetworkId, 8);
+			addFormNumericBox(F("Device Address"), F("p150_deviceaddress"), PCONFIG(P150_CONFIG_DEVICE_ADDRESS), 0, 255);
 
 			// Selector for Radio power
 			addRowLabel(F("Radio Power"));
@@ -620,13 +626,10 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 
 			PCONFIG(P150_CONFIG_HARDWARE_TYPE) = getFormItemInt(PCONFIG_LABEL(P150_CONFIG_HARDWARE_TYPE), 0);
 
-			unsigned long number = strtoul( web_server.arg(F("PLUGIN_150_NETWORKID")).c_str(), nullptr, 16);
-			for(int i=3; i>=0; i--){    // start with lowest byte of number
-				PLUGIN_150_ExtraSettings.networkId[i] = number & 0xFF;  // or: = byte( number);
-				number >>= 8;            // get next byte into position
-			}
-
-			addLog(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_150 + PLUGIN_150_ExtraSettings.networkId[0] + "-" +  PLUGIN_150_ExtraSettings.networkId[1] +"-" +  PLUGIN_150_ExtraSettings.networkId[2] +"-" +  PLUGIN_150_ExtraSettings.networkId[3]);
+			unsigned long number = strtoul( web_server.arg(F("p150_network_id")).c_str(), nullptr, 16);
+			PCONFIG(P150_CONFIG_NETWORKID_BYTE_3_4) = number & 0xFFFF;  // or: = byte( number);
+			number >>= 16;            // get next byte into position
+			PCONFIG(P150_CONFIG_NETWORKID_BYTE_1_2) = number & 0xFFFF;  // or: = byte( number);
 
 
 			PCONFIG(P150_CONFIG_DEVICE_ADDRESS) = atoi(web_server.arg(F("PLUGIN_150_DEVICEADDRESS")).c_str());
