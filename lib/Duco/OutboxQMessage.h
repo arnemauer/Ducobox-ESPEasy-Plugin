@@ -7,26 +7,22 @@
 
 #include "DucoPacket.h"
 
-
-class OutboxQMessage
-{
-	public:
-
-        DucoPacket packet;   
-        bool hasSent;
-        bool waitForAck;
-        bool ackReceived;
-        unsigned long ackTimer;
-        uint8_t sendRetries;
-
+class OutboxQMessage{
+    public:
+		DucoPacket packet;   
+		bool hasSent;
+		bool waitForAck;
+		bool ackReceived;
+		unsigned long ackTimer;
+		uint8_t sendRetries;
         OutboxQMessage(){
-                hasSent = true;
-                waitForAck = false;
-                ackReceived = true;
-                ackTimer = 0;
-                sendRetries = 0;               
+			hasSent = true;
+			waitForAck = false;
+			ackReceived = true;
+			ackTimer = 0;
+			sendRetries = 0;               
         }
 };
 
 
-#endif /* DUCOPACKET_H_ */
+#endif /* OUTBOXQMESSAGE_H_ */

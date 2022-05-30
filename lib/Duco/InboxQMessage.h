@@ -7,21 +7,14 @@
 
 #include "DucoPacket.h"
 
-
-class InboxQMessage
-{
+class InboxQMessage{
 	public:
-
         DucoPacket packet;   
         unsigned long timeReceivedMessage; // stores the time (millis) we received te message. If we can't process the message within 900ms stop processing the message.
         bool messageProcessed;
         InboxQMessage(){
-                timeReceivedMessage = 0;
-                messageProcessed = true;         
-        }
-
-        
+            timeReceivedMessage = 0;
+            messageProcessed = true;         
+        }      
 };
-
-
-#endif /* DUCOPACKET_H_ */
+#endif /* INBOXQMESSAGE_H_ */
