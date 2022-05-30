@@ -7,11 +7,16 @@
 #define CC1101PACKET_H_
 
 #include <stdio.h>
+//#ifdef ESP8266
+//#include <arduino.h>
+//#endif
 
 #define CC1101_BUFFER_LEN        64
 #define CC1101_DATA_LEN          CC1101_BUFFER_LEN - 3
 
-class CC1101Packet{
+
+class CC1101Packet
+{
 	public:
 		uint8_t length;
 		uint8_t data[32]; 	// The CC1101 is configured with a maximum packet size of 32 bytes (PKTLEN register)
@@ -31,5 +36,6 @@ class CC1101Packet{
      	*/
     	unsigned char lqi;
 };
+
 
 #endif /* CC1101PACKET_H_ */
