@@ -362,10 +362,16 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 				}
 		
 				if(PLUGIN_150_rf.pollNewDeviceAddress()){
+					if (loglevelActiveFor(LOG_LEVEL_DEBUG)) {
+						String log;
+						log += PLUGIN_LOG_PREFIX_150;
+						log += F("Set new address and network ID after succesfull join.");
+						addLogMove(LOG_LEVEL_DEBUG, log);
+					}
 					memcpy(Plugin_150_NetworkId, PLUGIN_150_rf.getnetworkID(), 4); //convert char array to uint8_t
 					PCONFIG(P150_CONFIG_DEVICE_ADDRESS) = PLUGIN_150_rf.getDeviceAddress();
-					SaveCustomTaskSettings(event->TaskIndex, reinterpret_cast<uint8_t *>(&Plugin_150_NetworkId), sizeof(Plugin_150_NetworkId));
-					SaveTaskSettings(event->TaskIndex);
+					PCONFIG(P150_CONFIG_NETWORKID_BYTE_1_2) = ((uint16_t)Plugin_150_NetworkId[0] << 8) | Plugin_150_NetworkId[1];
+					PCONFIG(P150_CONFIG_NETWORKID_BYTE_3_4) = ((uint16_t)Plugin_150_NetworkId[2] << 8) | Plugin_150_NetworkId[3];
 					SaveSettings();
 				}
 				
