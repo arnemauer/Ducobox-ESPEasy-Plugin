@@ -1,12 +1,12 @@
-#include "_Plugin_Helper.h"
-#include "DucoSerialHelpers.h"
-
 //#################################### Plugin 151: DUCO Serial Gateway ##################################
 //
 //  DUCO Serial Gateway to read Ducobox data
 //  https://github.com/arnemauer/Ducobox-ESPEasy-Plugin
 //  http://arnemauer.nl/ducobox-gateway/
 //#######################################################################################################
+
+#include "_Plugin_Helper.h"
+#include "DucoSerialHelpers.h"
 
 #define PLUGIN_151
 #define PLUGIN_ID_151 151
@@ -254,7 +254,7 @@ boolean Plugin_151(byte function, struct EventStruct *event, String &string){
 		case PLUGIN_INIT: {
 			
 			// load tasksettings, if we dont call this function, PCONFIG (Settings.TaskDevicePluginConfig) will be 0.
-			LoadTaskSettings(event->TaskIndex);
+			//LoadTaskSettings(event->TaskIndex);
 
 			// only initiate serial if we are the task with main plugin activated.
 			if(PCONFIG(P151_CONFIG_VALUE_TYPE) == P151_VALUE_VENTMODE){
@@ -369,7 +369,6 @@ boolean Plugin_151(byte function, struct EventStruct *event, String &string){
 				if(serialPortInUseByTask == event->TaskIndex){
 					if( (millis() - ducoSerialStartReading) > PLUGIN_READ_TIMEOUT_151){
 						log = PLUGIN_LOG_PREFIX_151;
-						log += F("P151_HARDWARE_84_AND_HIGHER");
 						log += F("Serial reading timeout");
 						addLogMove(LOG_LEVEL_DEBUG, log);
 

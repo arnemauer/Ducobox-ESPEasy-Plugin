@@ -6,26 +6,12 @@
 //  Parts of this code is based on the itho-library made by 'supersjimmie', 'Thinkpad', 'Klusjesman' and 'jodur'.
 //#######################################################################################################
 
-
-/*
-
-TODO:
-	- network id verdwijnt bij opslaan als plugin niet enabled is.
-	- P155 hum: https://github.com/arnemauer/Ducobox-ESPEasy-Plugin/issues/74
-
-
-*/
 #include "_Plugin_Helper.h"
-
 #include <SPI.h>
 #include "DucoCC1101.h"
 #include "DucoPacket.h"
 
-//This extra settings struct is needed because the default settingsstruct doesn't support strings
-//struct PLUGIN_150_ExtraSettingsStruct
-//{	
-	uint8_t Plugin_150_NetworkId[4];
-//} PLUGIN_150_ExtraSettings;
+uint8_t Plugin_150_NetworkId[4];
 DucoCC1101 PLUGIN_150_rf;
 
 // extra for interrupt handling
@@ -53,13 +39,6 @@ typedef enum {
 	P150_CONFIG_NETWORKID_BYTE_3_4 = 5,
 } P150PluginConfigs;
 
-
-//interrupt 
-
-volatile uint8_t PLUGIN_150_IRQ = false; //!<  irq flag
-volatile unsigned long PLUGIN_150_Int_time = 0;
-
-
 // DUCO default = 0xC1 and HIGH = 0xC0
 typedef enum {
 	P150_RADIO_POWER_DEFAULT = 0, // 0,6 dBm = 0x8D
@@ -85,7 +64,6 @@ String Plugin_150_radiopower_valuename(byte value_nr) {
   	return "";
 }
 
-
 typedef enum {
 	P150_HARDWARE_DIY = 0,
 	P150_HARDWARE_83_AND_LOWER = 1,
@@ -104,24 +82,22 @@ String Plugin_150_hardware_type(byte value_nr) {
   	return "";
 }
 
+//interrupt 
+volatile uint8_t PLUGIN_150_IRQ = false; //!<  irq flag
+volatile unsigned long PLUGIN_150_Int_time = 0;
+
 // Forward declarations
 void PLUGIN_150_DUCOcheck();
 void PLUGIN_150_Publishdata(struct EventStruct *event);
 void PLUGIN_150_hexstringToHex(char *hexString, uint8_t hexStringSize, unsigned char *hexArray, uint8_t hexArraySize, uint8_t *dataBytes );
 void PLUGIN_150_GetRfLog();
 
-
 // IRQ handler:
 ICACHE_RAM_ATTR void PLUGIN_150_interruptHandler(void)
 {
-	//if(PLUGIN_150_rf.checkForNewPacket()){
 		PLUGIN_150_IRQ = true; 
-		PLUGIN_150_Int_time = millis();
-
-		//addLogMove(LOG_LEVEL_DEBUG,PLUGIN_LOG_PREFIX_150 + F("IRQ!"));
-	//}
+		PLUGIN_150_Int_time = millis(); // cant be removed in the future
 }
-
 
 boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 {
@@ -296,10 +272,11 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 
 		case PLUGIN_EXIT:{
 			//remove interupt when plugin is removed
-			String log = PLUGIN_LOG_PREFIX_150;
-			log += F("EXIT PLUGIN_150");
-			addLogMove(LOG_LEVEL_INFO, log);
-			
+			if (loglevelActiveFor(LOG_LEVEL_DEBUG)) {
+				String log = PLUGIN_LOG_PREFIX_150;
+				log += F("EXIT PLUGIN_150");
+				addLogMove(LOG_LEVEL_INFO, log);
+			}
 			detachInterrupt(Plugin_150_IRQ_pin);
 			PLUGIN_150_rf.reset(); // reset CC1101
 
@@ -318,15 +295,16 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 			if(PLUGIN_150_InitRunned){
 				if(PLUGIN_150_IRQ){
 					PLUGIN_150_IRQ = false; 
-					String log;
-					unsigned long current_time = millis();
-					log += PLUGIN_150_Int_time;
-					log += F(" - ");
-					log += current_time;
-					log += F(" = ");
-					log += (current_time - PLUGIN_150_Int_time);
-					addLogMove(LOG_LEVEL_INFO, log);
-
+					if (loglevelActiveFor(LOG_LEVEL_DEBUG)) {
+						String log;
+						unsigned long current_time = millis();
+						log += PLUGIN_150_Int_time;
+						log += F(" - ");
+						log += current_time;
+						log += F(" = ");
+						log += (current_time - PLUGIN_150_Int_time);
+						addLogMove(LOG_LEVEL_INFO, log);
+					}
 					if(PLUGIN_150_rf.checkForNewPacket()){
 						
 						if (PCONFIG(P150_CONFIG_HARDWARE_TYPE) == P150_HARDWARE_84_AND_HIGHER){ // status led
@@ -375,10 +353,12 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 				// IRQ pin goes low after reading the first byte from RXfifo
 				// If the pin is still high the CC1101 received another message.
 				if(PLUGIN_150_rf.checkAndResetRxFifoOverflow()){
-					String log;
-					log += PLUGIN_LOG_PREFIX_150;
-					log += F("RX FIFO OVERFLOW -> idle, flush RX FIFO and switch to RX state.");
-					addLogMove(LOG_LEVEL_DEBUG, log);
+					if (loglevelActiveFor(LOG_LEVEL_DEBUG)) {
+						String log;
+						log += PLUGIN_LOG_PREFIX_150;
+						log += F("RX FIFO OVERFLOW -> idle, flush RX FIFO and switch to RX state.");
+						addLogMove(LOG_LEVEL_DEBUG, log);
+					}
 				}
 		
 				if(PLUGIN_150_rf.pollNewDeviceAddress()){
@@ -407,10 +387,12 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 
 			//Publish new data when vars are changed or init has runned
 			if (PLUGIN_150_OldState!=PLUGIN_150_State){
-				String log;
-				log += PLUGIN_LOG_PREFIX_150;
-				log += F("ventilation mode changed - UPDATE by PLUGIN_ONCE_A_SECOND");
-				addLogMove(LOG_LEVEL_DEBUG, log);
+				if (loglevelActiveFor(LOG_LEVEL_DEBUG)) {
+					String log;
+					log += PLUGIN_LOG_PREFIX_150;
+					log += F("ventilation mode changed - UPDATE by PLUGIN_ONCE_A_SECOND");
+					addLogMove(LOG_LEVEL_DEBUG, log);
+				}
 				UserVar[event->BaseVarIndex]=PLUGIN_150_State;
 				sendData(event);
 			
@@ -424,11 +406,12 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
     
     	case PLUGIN_READ: {    
         	// This ensures that even when Values are not changing, data is send at the configured interval for aquisition 
-			String log;
-			log += PLUGIN_LOG_PREFIX_150;
-			log += F("UPDATE by PLUGIN_READ");
-			addLogMove(LOG_LEVEL_DEBUG, log);
-			
+			if (loglevelActiveFor(LOG_LEVEL_DEBUG)) {
+				String log;
+				log += PLUGIN_LOG_PREFIX_150;
+				log += F("UPDATE by PLUGIN_READ");
+				addLogMove(LOG_LEVEL_DEBUG, log);
+			}
 			UserVar[event->BaseVarIndex]=PLUGIN_150_State;
         	success = true;
         	break;
@@ -596,15 +579,11 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 					success = true;
 				}
 
-
 				PLUGIN_150_GetRfLog();			
 	  			break; 
 		}
 
-
-
   		case PLUGIN_WEBFORM_SHOW_VALUES: {
-
 			String ventMode = "";
 			if(PLUGIN_150_InitRunned){
 				switch(PLUGIN_150_State){
@@ -624,8 +603,6 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 				ventMode = "Disabled"; 
 			}
 			// can't use pluginWebformShowValue because ajax will refresh the value with original value (number)
-			//addHtml(pluginWebformShowValue(event->TaskIndex, 0, F("Ventilationmode"), ventMode));
-
 			addHtml(F("<div class=\"div_l\" id=\"installermode\">Ventilationmode:</div>"));
 			addHtml(F("<div class=\"div_r\" id=\"ventilationModeValue\">"));
 			addHtml(ventMode);
@@ -670,8 +647,6 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 
 			break;
 		}
-
-
 
     	case PLUGIN_WEBFORM_LOAD: {
 			String log;
@@ -748,20 +723,13 @@ void PLUGIN_150_GetRfLog(){
 	uint8_t numberOfLogMessages = PLUGIN_150_rf.getNumberOfLogMessages();
 	String log;
 
-    //if (loglevelActiveFor(LOG_LEVEL_DEBUG) && log.reserve(144)) {
+    if (loglevelActiveFor(LOG_LEVEL_DEBUG) && log.reserve(144)) {
 		for(int i=0; i< numberOfLogMessages;i++){
-			//addLogMove(LOG_LEVEL_DEBUG, PLUGIN_LOG_PREFIX_150 + FreeMem());
-			//delay(3);
-		//	log = PLUGIN_LOG_PREFIX_150 + PLUGIN_150_rf.logMessages[i];
-			//addLog(LOG_LEVEL_INFO, log);
 			log += PLUGIN_LOG_PREFIX_150;
 			log += PLUGIN_150_rf.logMessages[i];
 			addLogMove(LOG_LEVEL_DEBUG, log);
-
-			//addLog(LOG_LEVEL_INFO, PLUGIN_LOG_PREFIX_150 + PLUGIN_150_rf.logMessages[i]);
 		}
-	//}
-
+	}
 }
 
 
@@ -772,7 +740,7 @@ void PLUGIN_150_DUCOcheck() {
 		uint8_t ventilationState = PLUGIN_150_rf.getCurrentVentilationMode();
 		bool permanentMode = PLUGIN_150_rf.getCurrentPermanentMode();
 
-      //  convert modbus status to "normal" duco status numbers
+     	//  convert modbus status to "normal" duco status numbers
 		if(!permanentMode){
 			switch(ventilationState){
 				case 0: { PLUGIN_150_State = 0; break; } // modbus 0 	= auto                   convert to duco 0  = "auto" = AutomaticMode;
@@ -780,32 +748,20 @@ void PLUGIN_150_DUCOcheck() {
 				case 5: { PLUGIN_150_State = 2; break; } // modbus 5 	= Manuele middenstand    convert to duco 2  = "man2" = ManualMode2; 
 				case 6: { PLUGIN_150_State = 3; break; } // modbus 6 	= Manuele hoogstand      convert to duco 3  = "man3" = ManualMode3; 
 				case 7: { PLUGIN_150_State = 4; break; } // modbus 7 	= Niet-thuis-stand       convert to duco 4  = "empt" = EmptyHouse;
-				default: { 	String log = PLUGIN_LOG_PREFIX_150; log += F("Unknown ventilationmode"); addLogMove(LOG_LEVEL_DEBUG, log); }
+				default: { 	String log = PLUGIN_LOG_PREFIX_150; log += F("Unknown ventilationmode"); addLogMove(LOG_LEVEL_INFO, log); }
 			}
 		}else{
 			switch(ventilationState){
 				case 4:  {  PLUGIN_150_State = 11; break; } // 	  		= continu LOW		    convert to duco 11  = "cnt1" = PermanentManualMode1;
 				case 5:  {  PLUGIN_150_State = 12; break; } //   	  	= continu MIDDLE       	convert to duco 12  = "cnt2" = PermanentManualMode2;
 				case 6:  {  PLUGIN_150_State = 13; break; } //      	= continu HIGH       	convert to duco 13  = "cnt3" = PermanentManualMode3;
-				default: {  String log = PLUGIN_LOG_PREFIX_150; log += F("Unknown ventilationmode"); addLogMove(LOG_LEVEL_DEBUG, log); }
+				default: {  String log = PLUGIN_LOG_PREFIX_150; log += F("Unknown ventilationmode"); addLogMove(LOG_LEVEL_INFO, log); }
 			}
 		}
 
 		PLUGIN_150_GetRfLog();
 
 }
-
-
-/*
-void PLUGIN_150_Publishdata(struct EventStruct *event) {
-   UserVar[event->BaseVarIndex]=PLUGIN_150_State;
-   String log = PLUGIN_LOG_PREFIX_150 + " State: ";
-   log += UserVar[event->BaseVarIndex];
-   addLogMove(LOG_LEVEL_DEBUG, log);
-}*/
-
-
-
 
 void PLUGIN_150_hexstringToHex(char *hexString, uint8_t hexStringSize, unsigned char *hexArray, uint8_t hexArraySize, uint8_t *dataBytes ){
 	const char *pos = hexString;

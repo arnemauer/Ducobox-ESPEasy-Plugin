@@ -6,10 +6,8 @@
 #ifndef DUCOPACKET_H_
 #define DUCOPACKET_H_
 
-class DucoPacket
-{
+class DucoPacket {
 	public:
-
 		uint8_t destinationAddress;   // destination address
 		uint8_t sourceAddress;     // source address
 		uint8_t originalDestinationAddress; // oringal destination address
@@ -40,6 +38,5 @@ class DucoPacket
      	*/
     	unsigned char lqi;
 };
-
 
 #endif /* DUCOPACKET_H_ */
