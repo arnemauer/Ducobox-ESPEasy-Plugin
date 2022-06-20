@@ -218,15 +218,17 @@ boolean Plugin_154(byte function, struct EventStruct *event, String& string){
         	if(serialPortInUseByTask == event->TaskIndex){
             	uint8_t result =0;
             	bool stop = false;
-            
+ 				bool receivedNewValue = false;
+           
             	while( (result = DucoSerialInterrupt()) != DUCO_MESSAGE_FIFO_EMPTY && stop == false){
                		switch(result){
                   		case DUCO_MESSAGE_ROW_END: {
                      		if(PCONFIG(P154_CONFIG_DEVICE) == P154_DUCO_DEVICE_CO2){
-                        		readExternalSensorsProcessRow(PLUGIN_LOG_PREFIX_154, event->BaseVarIndex, DUCO_DATA_EXT_SENSOR_CO2_PPM, PCONFIG(P154_CONFIG_NODE_ADDRESS), PCONFIG(P154_CONFIG_LOG_SERIAL));
+                        		receivedNewValue = readExternalSensorsProcessRow(PLUGIN_LOG_PREFIX_154, event->BaseVarIndex, DUCO_DATA_EXT_SENSOR_CO2_PPM, PCONFIG(P154_CONFIG_NODE_ADDRESS), PCONFIG(P154_CONFIG_LOG_SERIAL));
                      		}else if(PCONFIG(P154_CONFIG_DEVICE) == P154_DUCO_DEVICE_CO2_TEMP){
-                        		readExternalSensorsProcessRow(PLUGIN_LOG_PREFIX_154, event->BaseVarIndex, DUCO_DATA_EXT_SENSOR_TEMP, PCONFIG(P154_CONFIG_NODE_ADDRESS), PCONFIG(P154_CONFIG_LOG_SERIAL));
+                        		receivedNewValue = readExternalSensorsProcessRow(PLUGIN_LOG_PREFIX_154, event->BaseVarIndex, DUCO_DATA_EXT_SENSOR_TEMP, PCONFIG(P154_CONFIG_NODE_ADDRESS), PCONFIG(P154_CONFIG_LOG_SERIAL));
                      		}
+							if(receivedNewValue) sendData(event);
                      		duco_serial_bytes_read = 0; // reset bytes read counter
                      		break;
                   		}
@@ -318,7 +320,7 @@ void startReadExternalSensors(String logPrefix, uint8_t dataType, int nodeAddres
                      Done
 
                  */
-void readExternalSensorsProcessRow(String logPrefix, uint8_t userVarIndex, uint8_t dataType, int nodeAddress, bool serialLoggingEnabled){
+bool readExternalSensorsProcessRow(String logPrefix, uint8_t userVarIndex, uint8_t dataType, int nodeAddress, bool serialLoggingEnabled){
 	// get the first row to check for command, skip row 2 & 3, get row 4 (columnnames)
 	String log;
    	if(serialLoggingEnabled){	     
@@ -339,7 +341,7 @@ void readExternalSensorsProcessRow(String logPrefix, uint8_t userVarIndex, uint8
 			case DUCO_DATA_EXT_SENSOR_TEMP:{ parameter = P154_DUCO_PARAMETER_TEMP; break; }
 			case DUCO_DATA_EXT_SENSOR_RH:{ parameter = P154_DUCO_PARAMETER_RH; break; }
 			case DUCO_DATA_EXT_SENSOR_CO2_PPM:{ parameter = P154_DUCO_PARAMETER_CO2; break; }
-			default: { return; break; }
+			default: { return false; break; }
 		}
          
       	snprintf_P(command, sizeof(command), "nodeparaget %d %d", nodeAddress, parameter);
@@ -357,7 +359,7 @@ void readExternalSensorsProcessRow(String logPrefix, uint8_t userVarIndex, uint8
 				addLogMove(LOG_LEVEL_DEBUG, log);
 			}
 			DucoTaskStopSerial(logPrefix);
-         	return;
+         	return false;
       	}
 	}else if(duco_serial_rowCounter > 2){
 
@@ -382,7 +384,9 @@ void readExternalSensorsProcessRow(String logPrefix, uint8_t userVarIndex, uint8
          	log = logPrefix;
 			log += logBuf;
          	addLogMove(LOG_LEVEL_INFO, log);
+			return true;
       	}
    	} 
+	return false;
 } // end of readExternalSensors()
 

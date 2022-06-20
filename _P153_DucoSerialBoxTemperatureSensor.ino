@@ -177,11 +177,13 @@ boolean Plugin_153(byte function, struct EventStruct *event, String& string){
 			if(serialPortInUseByTask == event->TaskIndex){
 				uint8_t result = 0;
 				bool stop = false;
+				bool receivedNewValue = false;
 				
 				while( (result = DucoSerialInterrupt()) != DUCO_MESSAGE_FIFO_EMPTY && stop == false){
 					switch(result){
 						case DUCO_MESSAGE_ROW_END: {
-					readBoxSensorsProcessRow(PLUGIN_LOG_PREFIX_153, PCONFIG(P153_CONFIG_DEVICE), event->BaseVarIndex, PCONFIG(P153_CONFIG_LOG_SERIAL));
+							receivedNewValue = readBoxSensorsProcessRow(PLUGIN_LOG_PREFIX_153, PCONFIG(P153_CONFIG_DEVICE), event->BaseVarIndex, PCONFIG(P153_CONFIG_LOG_SERIAL));
+							if(receivedNewValue) sendData(event);
 							duco_serial_bytes_read = 0; // reset bytes read counter
 							break;
 						}

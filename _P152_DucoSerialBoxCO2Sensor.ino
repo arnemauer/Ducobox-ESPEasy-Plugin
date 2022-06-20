@@ -154,7 +154,6 @@ boolean Plugin_152(byte function, struct EventStruct *event, String& string){
 
 
 		case PLUGIN_SERIAL_IN: {
-
 			// if we unexpectedly receive data we need to flush and return success=true so espeasy won't interpret it as an serial command.
 			if(serialPortInUseByTask == 255){
 				DucoSerialFlush();
@@ -164,11 +163,12 @@ boolean Plugin_152(byte function, struct EventStruct *event, String& string){
 			if(serialPortInUseByTask == event->TaskIndex){
 				uint8_t result =0;
 				bool stop = false;
-					
+				bool receivedNewValue = false;
 				while( (result = DucoSerialInterrupt()) != DUCO_MESSAGE_FIFO_EMPTY && stop == false){
 					switch(result){
 						case DUCO_MESSAGE_ROW_END: {
-							readBoxSensorsProcessRow(PLUGIN_LOG_PREFIX_152, P152_DUCO_DEVICE_CO2, event->BaseVarIndex, PCONFIG(P152_CONFIG_LOG_SERIAL));
+							receivedNewValue = readBoxSensorsProcessRow(PLUGIN_LOG_PREFIX_152, P152_DUCO_DEVICE_CO2, event->BaseVarIndex, PCONFIG(P152_CONFIG_LOG_SERIAL));
+							if(receivedNewValue) sendData(event);
 							duco_serial_bytes_read = 0; // reset bytes read counter
 							break;
 						}
@@ -208,17 +208,17 @@ boolean Plugin_152(byte function, struct EventStruct *event, String& string){
 
 // ventilation % and DUCO status
 void startReadBoxSensors(String logPrefix){
- /*
-    * Read box sensor information; this could contain CO2, Temperature and
-    * Relative Humidity values, depending on the installed box sensors.
-    */
+	/*
+	* Read box sensor information; this could contain CO2, Temperature and
+	* Relative Humidity values, depending on the installed box sensors.
+	*/
 
-   // set this variables before sending command
+	// set this variables before sending command
 	ducoSerialStartReading = millis();
 	duco_serial_bytes_read = 0; // reset bytes read counter
 	duco_serial_rowCounter = 0; // reset row counter
 
-   char command[] = "sensorinfo\r\n";
+	char command[] = "sensorinfo\r\n";
 	DucoSerialStartSendCommand(command);
 }
 
@@ -236,91 +236,94 @@ sensorinfo
   RH   - SHT21 : 6252 [.01%] (0)
   TEMP - SHT21 :  174 [.1°C] (0)
    */
-void readBoxSensorsProcessRow( String logPrefix, uint8_t sensorDeviceType, uint8_t userVarIndex, bool serialLoggingEnabled){
-      String log;
-      if(serialLoggingEnabled && loglevelActiveFor(LOG_LEVEL_DEBUG)){	     
-			log = logPrefix;
-			log += F("ROW: ");
-			log += duco_serial_rowCounter;
-			log += F(" bytes read:");
-			log += duco_serial_bytes_read;
-         addLogMove(LOG_LEVEL_DEBUG, log);
-         DucoSerialLogArray(logPrefix, duco_serial_buf, duco_serial_bytes_read, 0);
-      }
+bool readBoxSensorsProcessRow( String logPrefix, uint8_t sensorDeviceType, uint8_t userVarIndex, bool serialLoggingEnabled){
+    String log;
+    if(serialLoggingEnabled && loglevelActiveFor(LOG_LEVEL_DEBUG)){	     
+		log = logPrefix;
+		log += F("ROW: ");
+		log += duco_serial_rowCounter;
+		log += F(" bytes read:");
+		log += duco_serial_bytes_read;
+		addLogMove(LOG_LEVEL_DEBUG, log);
+		DucoSerialLogArray(logPrefix, duco_serial_buf, duco_serial_bytes_read, 0);
+	}
 
     // get the first row to check for command
 	if( duco_serial_rowCounter == 1){
 		if (DucoSerialCheckCommandInResponse(logPrefix, "sensorinfo") ) {
-         if(loglevelActiveFor(LOG_LEVEL_DEBUG)){
-            log = logPrefix;
-            log += F("Received correct response on sensorinfo");
-            addLogMove(LOG_LEVEL_DEBUG, log);
-         }
-      } else {
-         if(loglevelActiveFor(LOG_LEVEL_DEBUG)){
-            log = logPrefix;
-            log += F("Received invalid response");
-            addLogMove(LOG_LEVEL_DEBUG, log);
-         }
+         	if(loglevelActiveFor(LOG_LEVEL_DEBUG)){
+				log = logPrefix;
+				log += F("Received correct response on sensorinfo");
+				addLogMove(LOG_LEVEL_DEBUG, log);
+         	}
+      	} else {
+			if(loglevelActiveFor(LOG_LEVEL_DEBUG)){
+				log = logPrefix;
+				log += F("Received invalid response");
+				addLogMove(LOG_LEVEL_DEBUG, log);
+			}
 			DucoTaskStopSerial(logPrefix);
-         return;
-      }
+         	return false;
+      	}
 	}else if( duco_serial_rowCounter > 2){
-      duco_serial_buf[duco_serial_bytes_read] = '\0';
-      unsigned int raw_value;
-      char logBuf[30];
+		duco_serial_buf[duco_serial_bytes_read] = '\0';
+		unsigned int raw_value;
+		char logBuf[30];
 
-
-	   if(sensorDeviceType == P152_DUCO_DEVICE_CO2){     
-         if (strlen("  CO") <= duco_serial_bytes_read && strncmp("  CO", (char*) duco_serial_buf, strlen("  CO")) == 0) {
-            char* startByteValue = strchr((char*) duco_serial_buf,':');
-            if(startByteValue != NULL ){
-               if (sscanf(startByteValue, ": %u", &raw_value) == 1) {
-                  unsigned int co2_ppm = raw_value; /* No conversion required */
-                  UserVar[userVarIndex] = co2_ppm;
-                  snprintf(logBuf, sizeof(logBuf), "CO2 PPM: %u = %u PPM", raw_value, co2_ppm);
-                  log = logPrefix;
-                  log += logBuf;
-                  addLogMove(LOG_LEVEL_INFO, log);
-               }
-            }
-        }
-      }
+	   	if(sensorDeviceType == P152_DUCO_DEVICE_CO2){     
+         	if (strlen("  CO") <= duco_serial_bytes_read && strncmp("  CO", (char*) duco_serial_buf, strlen("  CO")) == 0) {
+            	char* startByteValue = strchr((char*) duco_serial_buf,':');
+            	if(startByteValue != NULL ){
+               		if (sscanf(startByteValue, ": %u", &raw_value) == 1) {
+						unsigned int co2_ppm = raw_value; /* No conversion required */
+						UserVar[userVarIndex] = co2_ppm;
+						snprintf(logBuf, sizeof(logBuf), "CO2 PPM: %u = %u PPM", raw_value, co2_ppm);
+						log = logPrefix;
+						log += logBuf;
+						addLogMove(LOG_LEVEL_INFO, log);
+						return true;
+               		}
+            	}
+        	}
+      	}
 
 		if(sensorDeviceType == P152_DUCO_DEVICE_RH){
-         if (strlen("  RH") <= duco_serial_bytes_read && strncmp("  RH", (char*) duco_serial_buf, strlen("  RH")) == 0) {
-            char* startByteValue = strchr((char*) duco_serial_buf,':');
-            if(startByteValue != NULL ){
-               if (sscanf((const char*)startByteValue, ": %u", &raw_value) == 1) {
-                  float rh = (float) raw_value / 100.;
-                  UserVar[userVarIndex + 1] = rh;
-                  snprintf(logBuf, sizeof(logBuf), "RH: %u = %.2f%%", raw_value, rh);
-                  log = logPrefix;
-                  log += logBuf;
-                  addLogMove(LOG_LEVEL_INFO, log);
-               }
-            }
-         }
-      }
+         	if (strlen("  RH") <= duco_serial_bytes_read && strncmp("  RH", (char*) duco_serial_buf, strlen("  RH")) == 0) {
+            	char* startByteValue = strchr((char*) duco_serial_buf,':');
+            	if(startByteValue != NULL ){
+               		if (sscanf((const char*)startByteValue, ": %u", &raw_value) == 1) {
+                 		float rh = (float) raw_value / 100.;
+                  		UserVar[userVarIndex + 1] = rh;
+						snprintf(logBuf, sizeof(logBuf), "RH: %u = %.2f%%", raw_value, rh);
+						log = logPrefix;
+						log += logBuf;
+						addLogMove(LOG_LEVEL_INFO, log);
+						return true;
+
+               		}
+            	}
+         	}
+      	}
 
 		if(sensorDeviceType == P152_DUCO_DEVICE_CO2_TEMP || sensorDeviceType == P152_DUCO_DEVICE_RH){
-         if (strlen("  TEMP") <= duco_serial_bytes_read && strncmp("  TEMP", (char*) duco_serial_buf, strlen("  TEMP")) == 0) {
-            log = logPrefix;
-            log += F("row starts with TEMP");
-            addLogMove(LOG_LEVEL_DEBUG, log);
-            char* startByteValue = strchr((char*) duco_serial_buf,':');
-            if(startByteValue != NULL ){
-               if (sscanf((const char*)startByteValue, ": %u", &raw_value) == 1) {
-                  float temp = (float) raw_value / 10.;
-                  UserVar[userVarIndex] = temp;
-                  snprintf(logBuf, sizeof(logBuf), "TEMP: %u = %.1fÂ°C", raw_value, temp);
-                  log = logPrefix;
-                  log += logBuf;
-                  addLogMove(LOG_LEVEL_INFO, log);
-               }
-            }
-         }
+        	if (strlen("  TEMP") <= duco_serial_bytes_read && strncmp("  TEMP", (char*) duco_serial_buf, strlen("  TEMP")) == 0) {
+				log = logPrefix;
+				log += F("row starts with TEMP");
+				addLogMove(LOG_LEVEL_DEBUG, log);
+				char* startByteValue = strchr((char*) duco_serial_buf,':');
+            	if(startByteValue != NULL ){
+               		if (sscanf((const char*)startByteValue, ": %u", &raw_value) == 1) {
+						float temp = (float) raw_value / 10.;
+						UserVar[userVarIndex] = temp;
+						snprintf(logBuf, sizeof(logBuf), "TEMP: %u = %.1fÂ°C", raw_value, temp);
+						log = logPrefix;
+						log += logBuf;
+						addLogMove(LOG_LEVEL_INFO, log);
+						return true;
+               		}
+            	}
+         	}
+   		}
    	}
-   }
-   return;
+   	return false;
 }

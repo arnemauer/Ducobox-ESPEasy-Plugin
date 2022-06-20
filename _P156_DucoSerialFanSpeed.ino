@@ -165,11 +165,12 @@ boolean Plugin_156(byte function, struct EventStruct *event, String& string){
 			if(serialPortInUseByTask == event->TaskIndex){
 				uint8_t result = 0;
 				bool stop = false;
-			
+				bool receivedNewValue = false;
 				while( (result = DucoSerialInterrupt()) != DUCO_MESSAGE_FIFO_EMPTY && stop == false){
 					switch(result){
 						case DUCO_MESSAGE_ROW_END: {
-                  			Plugin_156_readFanSpeedProcessRow(PLUGIN_LOG_PREFIX_156, event->BaseVarIndex, PCONFIG(P156_CONFIG_LOG_SERIAL));
+                  			receivedNewValue = Plugin_156_readFanSpeedProcessRow(PLUGIN_LOG_PREFIX_156, event->BaseVarIndex, PCONFIG(P156_CONFIG_LOG_SERIAL));
+							if(receivedNewValue) sendData(event);
 							duco_serial_bytes_read = 0; // reset bytes read counter
 							break;
 						}
@@ -221,7 +222,7 @@ void Plugin_156_startReadFanSpeed(String logPrefix){
 
 		>
 	*/
-void Plugin_156_readFanSpeedProcessRow(String logPrefix, uint8_t userVarIndex, bool serialLoggingEnabled){
+bool Plugin_156_readFanSpeedProcessRow(String logPrefix, uint8_t userVarIndex, bool serialLoggingEnabled){
  
 	String log;
 	if(serialLoggingEnabled && loglevelActiveFor(LOG_LEVEL_DEBUG)){	     
@@ -251,7 +252,7 @@ void Plugin_156_readFanSpeedProcessRow(String logPrefix, uint8_t userVarIndex, b
 				addLogMove(LOG_LEVEL_DEBUG, log);
 			}
 			DucoTaskStopSerial(logPrefix);
-			return;
+			return false;
 		}
 
 	}else if( duco_serial_rowCounter > 1){
@@ -266,9 +267,10 @@ void Plugin_156_readFanSpeedProcessRow(String logPrefix, uint8_t userVarIndex, b
 			snprintf(logBuf, sizeof(logBuf), "Fanspeed: %u RPM", fanSpeedFiltered);
          	log = logPrefix;
 			log += logBuf;
-         	addLogMove(LOG_LEVEL_INFO, log);		
+         	addLogMove(LOG_LEVEL_INFO, log);
+			return true;		
 		} 
 
 	}
-	return;
+	return false;
 } 

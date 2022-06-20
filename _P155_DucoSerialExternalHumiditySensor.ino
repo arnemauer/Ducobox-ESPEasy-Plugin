@@ -179,15 +179,17 @@ boolean Plugin_155(byte function, struct EventStruct *event, String& string){
          	if(serialPortInUseByTask == event->TaskIndex){
             	uint8_t result =0;
             	bool stop = false;
-            
+				bool receivedNewValue = false;
+
             	while( (result = DucoSerialInterrupt()) != DUCO_MESSAGE_FIFO_EMPTY && stop == false){
                		switch(result){
                   		case DUCO_MESSAGE_ROW_END: {
 							if(P155_readTemperature[event->TaskIndex]){ // true = read temperature
-								readExternalSensorsProcessRow(PLUGIN_LOG_PREFIX_155, event->BaseVarIndex, DUCO_DATA_EXT_SENSOR_TEMP, PCONFIG(P155_CONFIG_NODE_ADDRESS), PCONFIG(P155_CONFIG_LOG_SERIAL));
+								receivedNewValue = readExternalSensorsProcessRow(PLUGIN_LOG_PREFIX_155, event->BaseVarIndex, DUCO_DATA_EXT_SENSOR_TEMP, PCONFIG(P155_CONFIG_NODE_ADDRESS), PCONFIG(P155_CONFIG_LOG_SERIAL));
 							}else{ // false = read humidity
-								readExternalSensorsProcessRow(PLUGIN_LOG_PREFIX_155, (event->BaseVarIndex + 1), DUCO_DATA_EXT_SENSOR_RH, PCONFIG(P155_CONFIG_NODE_ADDRESS), PCONFIG(P155_CONFIG_LOG_SERIAL));
+								receivedNewValue = readExternalSensorsProcessRow(PLUGIN_LOG_PREFIX_155, (event->BaseVarIndex + 1), DUCO_DATA_EXT_SENSOR_RH, PCONFIG(P155_CONFIG_NODE_ADDRESS), PCONFIG(P155_CONFIG_LOG_SERIAL));
 							}
+							if(receivedNewValue) sendData(event);
                      		duco_serial_bytes_read = 0; // reset bytes read counter
 							break;
                   		}
