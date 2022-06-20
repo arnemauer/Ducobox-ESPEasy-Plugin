@@ -520,7 +520,7 @@ void Plugin_151_disableCoreLogLevel(){
 void Plugin_151_disableCoreLogLevel_processRow(struct EventStruct *event, bool serialLoggingEnabled ){
     
 	if ( PCONFIG(P151_CONFIG_LOG_SERIAL)){
-		if(duco_serial_rowCounter <3 ){
+		if(duco_serial_rowCounter <4 ){
 			String prefix;
 			prefix += PLUGIN_LOG_PREFIX_151;
 			prefix += F("ROW: ");
