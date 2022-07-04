@@ -104,8 +104,9 @@ boolean Plugin_156(byte function, struct EventStruct *event, String& string){
 				}
 				// check if serial port is in use by another task, otherwise set flag.
 				if(serialPortInUseByTask == 255){
+					serialPortInUseByTask = event->TaskIndex;
+
 					if(loglevelActiveFor(LOG_LEVEL_DEBUG)){
-						serialPortInUseByTask = event->TaskIndex;
 						log = PLUGIN_LOG_PREFIX_156;
 						log += F("Start reading fanspeed");
 						addLogMove(LOG_LEVEL_DEBUG, log);
@@ -261,7 +262,6 @@ bool Plugin_156_readFanSpeedProcessRow(String logPrefix, uint8_t userVarIndex, b
 
 		if (sscanf((const char*)duco_serial_buf, "  FanSpeed: Actual %*u %*s %*s %*s %u", &fanSpeedFiltered) == 1) {
 			UserVar[userVarIndex] = fanSpeedFiltered;           
-			
 			
 			char logBuf[55];
 			snprintf(logBuf, sizeof(logBuf), "Fanspeed: %u RPM", fanSpeedFiltered);
