@@ -300,16 +300,29 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 			if(PLUGIN_150_InitRunned){
 				if(PLUGIN_150_IRQ){
 					PLUGIN_150_IRQ = false; 
-					if (loglevelActiveFor(LOG_LEVEL_DEBUG)) {
-						String log;
+					String log;
+					uint8_t rxBytes;
+					uint8_t marcState;
+					char LogBuf[80];
+
+					if (loglevelActiveFor(LOG_LEVEL_DEBUG)) {	
 						unsigned long current_time = millis();
+						log += PLUGIN_LOG_PREFIX_150;
 						log += PLUGIN_150_Int_time;
 						log += F(" - ");
 						log += current_time;
 						log += F(" = ");
 						log += (current_time - PLUGIN_150_Int_time);
-						addLogMove(LOG_LEVEL_INFO, log);
+						addLogMove(LOG_LEVEL_DEBUG, log);
+
+						rxBytes = PLUGIN_150_rf.TEST_getRxBytes();
+						marcState = PLUGIN_150_rf.getMarcState(true);
+						log = PLUGIN_LOG_PREFIX_150;
+						snprintf(LogBuf, sizeof(LogBuf), "rxBYTES: %02X (hex) %d (dec); getMarcState %02X",rxBytes,rxBytes, marcState);
+						log += LogBuf;
+						addLogMove(LOG_LEVEL_DEBUG, log);
 					}
+
 					if(PLUGIN_150_rf.checkForNewPacket()){
 						
 						if (PCONFIG(P150_CONFIG_HARDWARE_TYPE) == P150_HARDWARE_84_AND_HIGHER){ // status led
@@ -322,6 +335,19 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 
 						PLUGIN_150_DUCOcheck();
 						PLUGIN_150_GetRfLog(); // get log messages
+					}else{
+						if (loglevelActiveFor(LOG_LEVEL_DEBUG)) {
+							String log2 = PLUGIN_LOG_PREFIX_150;
+							log2 += F("!!! Interrupt received, but no new message?!");
+							addLogMove(LOG_LEVEL_DEBUG, log2);
+							rxBytes = PLUGIN_150_rf.TEST_getRxBytes();
+							marcState = PLUGIN_150_rf.getMarcState(true);
+							log = PLUGIN_LOG_PREFIX_150;
+							snprintf(LogBuf, sizeof(LogBuf), "rxBYTES: %02X (hex) %d (dec); getMarcState %02X",rxBytes,rxBytes, marcState);
+							log += LogBuf;
+							addLogMove(LOG_LEVEL_DEBUG, log);
+						}
+
 					}
 				}
 
