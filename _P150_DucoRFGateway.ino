@@ -536,6 +536,7 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 						addLogMove(LOG_LEVEL_INFO, log);
 						printWebString += log;
 					}
+					success = true;
 				}else if (cmd.equalsIgnoreCase(F("INSTALLERMODE"))){
 					// check if task is enabled
 					if (Settings.TaskDeviceEnabled[event->TaskIndex]) {
@@ -556,6 +557,8 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 					}
 					addLogMove(LOG_LEVEL_INFO, log);
 					printWebString += log;
+					success = true;
+
 				}else if (cmd.equalsIgnoreCase(F("CC1101STATUS"))){
 
 					uint8_t marcState = PLUGIN_150_rf.getMarcState(true);
@@ -656,7 +659,7 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 					success = true;
 				}
 
-				PLUGIN_150_GetRfLog();			
+				PLUGIN_150_GetRfLog();
 	  			break; 
 		}
 
@@ -807,8 +810,6 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 } 
 
 
-
-
 void PLUGIN_150_GetRfLog(){
 	uint8_t numberOfLogMessages = PLUGIN_150_rf.getNumberOfLogMessages();
 	String log;
@@ -821,7 +822,6 @@ void PLUGIN_150_GetRfLog(){
 		}
 	}
 }
-
 
 
 void PLUGIN_150_DUCOcheck() {
@@ -850,7 +850,6 @@ void PLUGIN_150_DUCOcheck() {
 		}
 
 		PLUGIN_150_GetRfLog();
-
 }
 
 void PLUGIN_150_hexstringToHex(char *hexString, uint8_t hexStringSize, unsigned char *hexArray, uint8_t hexArraySize, uint8_t *dataBytes ){
