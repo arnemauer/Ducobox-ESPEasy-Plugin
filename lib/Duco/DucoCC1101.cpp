@@ -1743,6 +1743,59 @@ uint8_t DucoCC1101::TEST_readFreqest(){
 	return freqest;
 }
 
+
+
+void DucoCC1101::TEST_setFrequency(uint8_t freq2, uint8_t freq1, uint8_t freq0){
+
+	writeCommand(CC1101_SIDLE);
+	writeCommand(CC1101_SIDLE);
+
+	writeRegister(CC1101_FREQ0, freq0); // duco 0x10   / 0x17
+	writeRegister(CC1101_FREQ1, freq1); // duco 0x10   / 0x17
+	writeRegister(CC1101_FREQ2, freq2); // duco 0x10   / 0x17
+
+	writeCommand(CC1101_SIDLE);
+	writeCommand(CC1101_SIDLE);
+
+	writeCommand(CC1101_SCAL);
+
+	//wait for calibration to finish
+	//while ((readRegisterWithSyncProblem(CC1101_MARCSTATE, CC1101_STATUS_REGISTER)) != CC1101_MARCSTATE_IDLE) yield();
+	// ADDED: Timeout added because device will loop when there is no response from cc1101. 
+	unsigned long startedWaiting = millis();
+	while((readRegisterWithSyncProblem(CC1101_MARCSTATE, CC1101_STATUS_REGISTER)) != CC1101_MARCSTATE_IDLE && millis() - startedWaiting <= 1000)
+	{
+		//esp_yield();
+		delay(0); // delay will call esp_yield()
+	}
+
+	if((readRegisterWithSyncProblem(CC1101_MARCSTATE, CC1101_STATUS_REGISTER)) != CC1101_MARCSTATE_IDLE){
+		this->ducoDeviceState = ducoDeviceState_initialisationCalibrationFailed;
+		return;
+	}
+
+	writeCommand(CC1101_SRX);
+	// wait till in rx mode (0x1F)
+	//while ((readRegisterWithSyncProblem(CC1101_MARCSTATE, CC1101_STATUS_REGISTER)) != CC1101_MARCSTATE_RX) yield();
+	// ADDED: Timeout added because device will loop when there is no response from cc1101. 
+	startedWaiting = millis();
+	while((readRegisterWithSyncProblem(CC1101_MARCSTATE, CC1101_STATUS_REGISTER)) != CC1101_MARCSTATE_RX && millis() - startedWaiting <= 1000)
+	{
+		delay(0); // delay will call esp_yield()
+	}
+
+	setLogMessage(F("Changed Freq0 + radio in RX mode;"));
+
+	if((readRegisterWithSyncProblem(CC1101_MARCSTATE, CC1101_STATUS_REGISTER)) != CC1101_MARCSTATE_RX){
+		this->ducoDeviceState = ducoDeviceState_initialisationRxmodeFailed;
+		setLogMessage(F("ducoDeviceState_initialisationRxmodeFailed;"));
+		return;
+	}	
+}
+
+
+
+
 void DucoCC1101::sendTestMessage(){
 
 	// get a free spot in OutboxQ

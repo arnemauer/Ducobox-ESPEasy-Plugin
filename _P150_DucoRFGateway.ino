@@ -599,6 +599,23 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 					printWebString += log;
 					success = true;
 
+				}else if (cmd.equalsIgnoreCase(F("SETFREQUENCY"))){
+
+					String param2 = parseString(tmpString, 3);
+					String param3 = parseString(tmpString, 4);
+
+					uint8_t freq0 = atoi(param3.c_str()); // if empty percentage will be 0
+					uint8_t freq1 = atoi(param2.c_str()); // if empty percentage will be 0
+					uint8_t freq2 = atoi(param1.c_str()); // if empty percentage will be 0
+
+					PLUGIN_150_rf.TEST_setFrequency(freq2, freq1, freq0);
+					PLUGIN_150_GetRfLog();
+					log += F("Changed frequency in CC1101 register. See log messages!");
+					addLogMove(LOG_LEVEL_INFO, log);
+					printWebString += log;
+					success = true;
+
+
 				}else if (cmd.equalsIgnoreCase(F("DUCOTESTMESSAGE"))){
 					// MESSAGETYPE
 					uint8_t messageType = atoi(param1.c_str()); // if empty value will be 0

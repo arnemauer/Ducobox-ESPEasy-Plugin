@@ -193,6 +193,8 @@ class DucoCC1101 : protected CC1101 {
 		uint8_t TEST_getRxBytes();
 		void TEST_readAllRegisters();
 		uint8_t TEST_readFreqest();
+		void TEST_setFrequency(uint8_t freq2, uint8_t freq1, uint8_t freq0);
+
 		void TEST_GDOTest();
 		void sendTestMessage();
 		uint8_t getMarcState(bool noLogMessage);
