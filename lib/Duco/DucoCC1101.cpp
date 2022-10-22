@@ -21,6 +21,8 @@ DucoCC1101::DucoCC1101(uint8_t counter, uint8_t sendTries) : CC1101()
 
 	//this->testCounter = 0; // temp 
 	
+	this->messageReceivedCounter = 0;
+	this->messageSentCounter = 0;	
 	this->messageCounter = 1; // for messages out NEVER ZERO!
 	//this->lastRssiByte = 0;
 
@@ -266,7 +268,13 @@ void DucoCC1101::sendDataToDuco(CC1101Packet *packet, uint8_t outboxQMessageNumb
 	if(outboxQ[outboxQMessageNumber].waitForAck == true){
 		waitForAck(outboxQMessageNumber);
 	}
-	
+
+	// Update messageSentCounter
+	if(messageSentCounter < ULINT_MAX){
+		messageSentCounter++;
+	}else{
+		messageSentCounter=0;
+	}
 }
 
 
@@ -351,6 +359,14 @@ uint8_t DucoCC1101::getOutboxQFreeSpot(){
 bool DucoCC1101::checkForNewPacket()
 {
 	if (receiveData(&inMessage)){
+
+		// Update receivedMessageCount
+		if(messageReceivedCounter < ULINT_MAX){
+			messageReceivedCounter++;
+		}else{
+			messageReceivedCounter=0;
+		}
+
 		if(inMessage.length < 8 ){
 			//discard package? length is smaller dan minimal packet length.... 
 			// resulting in negative uint8_t inDucoPacket.dataLength :S

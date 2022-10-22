@@ -28,6 +28,9 @@ bool PLUGIN_150_SubscribeMessageSend = false;
 #define PLUGIN_ID_150         150
 #define PLUGIN_NAME_150       "DUCO ventilation remote"
 #define PLUGIN_VALUENAME1_150 "Ventilationmode"
+#define PLUGIN_VALUENAME2_150 "messageReceivedCounter"
+#define PLUGIN_VALUENAME3_150 "messageSentCounter"
+
 #define PLUGIN_LOG_PREFIX_150   String("[P150] RF GW: ")
 
 typedef enum {
@@ -113,7 +116,7 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 			Device[deviceCount].PullUpOption 		= false;
 			Device[deviceCount].InverseLogicOption 	= false;
 			Device[deviceCount].FormulaOption 		= false;
-			Device[deviceCount].ValueCount 			= 1;
+			Device[deviceCount].ValueCount 			= 3;
 			Device[deviceCount].SendDataOption 		= true;
 			Device[deviceCount].TimerOption 		= true;
 			Device[deviceCount].TimerOptional      	= false;
@@ -128,6 +131,8 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 
 		case PLUGIN_GET_DEVICEVALUENAMES:{
 			strcpy_P(ExtraTaskSettings.TaskDeviceValueNames[0], PSTR(PLUGIN_VALUENAME1_150));
+			strcpy_P(ExtraTaskSettings.TaskDeviceValueNames[1], PSTR(PLUGIN_VALUENAME2_150));
+			strcpy_P(ExtraTaskSettings.TaskDeviceValueNames[2], PSTR(PLUGIN_VALUENAME3_150));
 			break;
 		}
 
@@ -418,7 +423,9 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 				log += F("UPDATE by PLUGIN_READ");
 				addLogMove(LOG_LEVEL_DEBUG, log);
 			}
-			UserVar[event->BaseVarIndex]=PLUGIN_150_State;
+			UserVar[event->BaseVarIndex]		=	PLUGIN_150_State;
+			UserVar[event->BaseVarIndex + 1]	=	PLUGIN_150_rf.getMessageReceivedCounter();
+			UserVar[event->BaseVarIndex + 2]	=	PLUGIN_150_rf.getMessageSentCounter();	
         	success = true;
         	break;
     	}  
@@ -612,6 +619,19 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 			addHtml(F("<div class=\"div_l\" id=\"installermode\">Ventilationmode:</div>"));
 			addHtml(F("<div class=\"div_r\" id=\"ventilationModeValue\">"));
 			addHtml(ventMode);
+			addHtml(F("</div>"));
+			addHtml(F("<div class=\"div_br\"></div>"));
+			addHtml(F("<div class=\"div_l\" id=\"installermode\">MessageReceivedCounter:</div>"));
+			addHtml(F("<div class=\"div_r\" id=\"messageReceivedCounterValue\">"));
+			char counter[15];
+			snprintf(counter, sizeof(counter), "%lu", PLUGIN_150_rf.getMessageReceivedCounter());
+			addHtml(counter);
+			addHtml(F("</div>"));
+			addHtml(F("<div class=\"div_br\"></div>"));
+			addHtml(F("<div class=\"div_l\" id=\"installermode\">MessageSentCounter:</div>"));
+			addHtml(F("<div class=\"div_r\" id=\"messageSentCounterValue\">"));
+			snprintf(counter, sizeof(counter), "%lu", PLUGIN_150_rf.getMessageSentCounter());
+			addHtml(counter);
 			addHtml(F("</div>"));
 			addHtml(F("<div class=\"div_br\"></div>"));
 

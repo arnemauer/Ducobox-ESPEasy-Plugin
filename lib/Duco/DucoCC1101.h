@@ -150,6 +150,13 @@ class DucoCC1101 : protected CC1101 {
 		uint8_t getNumberOfLogMessages();
 		char logMessages[NUMBER_OF_LOG_STRING][MAX_LOG_STRING_SIZE];
 
+		#define ULINT_MAX 4294967295
+		unsigned long int messageReceivedCounter; 	// 0 to 4,294,967,295 
+		unsigned long int messageSentCounter;		// 0 to 4,294,967,295 
+
+		unsigned long int getMessageReceivedCounter() { return this->messageReceivedCounter; }	
+		unsigned long int getMessageSentCounter() { return this->messageSentCounter; }	
+
 		void checkForAck();
 		void processReceivedAck(uint8_t messageCounter);
 
