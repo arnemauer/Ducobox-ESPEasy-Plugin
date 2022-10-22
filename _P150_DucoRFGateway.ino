@@ -569,7 +569,16 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 
 				}else if (cmd.equalsIgnoreCase(F("RXBYTES"))){
 
-					uint8_t marcState = PLUGIN_150_rf.TEST_getRxBytes();
+					uint8_t rxBytes = PLUGIN_150_rf.TEST_getRxBytes();
+
+					char LogBuf[40];
+					snprintf(LogBuf, sizeof(LogBuf), "rxBYTES: %02X (hex) %d (dec)",rxBytes,rxBytes);
+					log += LogBuf;
+					addLogMove(LOG_LEVEL_INFO, log);
+					printWebString += log;
+					success = true;
+
+
 
 					char LogBuf[20];
 					snprintf(LogBuf, sizeof(LogBuf), "rxBYTES: %02X",marcState);
