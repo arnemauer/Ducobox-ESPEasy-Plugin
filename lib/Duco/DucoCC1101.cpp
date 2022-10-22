@@ -457,8 +457,14 @@ void DucoCC1101::processMessage(uint8_t inboxQMessageNumber)
 
 						case ducomsg_message:{
 							setLogMessage(F("Received messagetype: Normal message"));
-							sendAck(inboxQMessageNumber); 
-							parseMessageCommand(inboxQMessageNumber);	
+							#if defined TEST_GATEWAY
+							TEST_processTestMessage(inboxQMessageNumber);
+							#else
+							sendAck(inboxQMessageNumber);
+							parseMessageCommand(inboxQMessageNumber);
+							#endif
+
+
 							break;
 						}
 
@@ -1647,6 +1653,55 @@ void DucoCC1101::TEST_writeRegister(uint8_t address, uint8_t data){
 uint8_t DucoCC1101::TEST_readFreqest(){
 	uint8_t freqest = readRegister(0xF2);
 	return freqest;
+}
+
+
+void DucoCC1101::TEST_processTestMessage(uint8_t inboxQMessageNumber){
+	setLogMessage(F("Received messagetype: Normal message"));
+
+	if(inboxQ[inboxQMessageNumber].packet.dataLength < 6){
+		return;
+	}
+
+	const uint8_t request[6] = {0x47, 0x57, 0x54, 0x45, 0x53, 0x54}; // GWTEST
+	bool error = false;
+	uint8_t i = 0;
+	while( (error == false) && (i <=5)){
+		// check if data in packet is the data we expected to receive
+		if(inboxQ[inboxQMessageNumber].packet.data[i] != request[i]){
+			error = true;
+		}
+		i++;
+	}
+
+	if(error == false && i == 6){ // if i==6 and error == false, we have a match
+		setLogMessage(F("Received GWTEST message from testdevice"));
+		// get a free spot in OutboxQ
+		uint8_t outboxQMessageNumber = getOutboxQFreeSpot();
+		if(outboxQMessageNumber == 255){
+			setLogMessage(F("No free space in outboxQ, dropping message;"));
+			return;
+		}
+
+		resetOutDucoPacket(outboxQMessageNumber);
+		outboxQ[outboxQMessageNumber].packet.messageType = ducomsg_message;
+		outboxQ[outboxQMessageNumber].packet.data[0] = 0x54; // T
+		outboxQ[outboxQMessageNumber].packet.data[1] = 0x45; // E
+		outboxQ[outboxQMessageNumber].packet.data[2] = 0x53; // S
+		outboxQ[outboxQMessageNumber].packet.data[3] = 0x54; // T
+		outboxQ[outboxQMessageNumber].packet.data[4] = 0x4f; // O
+		outboxQ[outboxQMessageNumber].packet.data[5] = 0x4b; // K
+		outboxQ[outboxQMessageNumber].packet.dataLength = 6;
+	
+		prefillDucoPacket(&outboxQ[outboxQMessageNumber].packet, 0x01); // address duco
+		outboxQ[outboxQMessageNumber].packet.counter = 0x08;
+		ducoToCC1101Packet(&outboxQ[outboxQMessageNumber].packet, &outMessage);
+		sendDataToDuco(&outMessage,outboxQMessageNumber);
+
+		// update outboxQMessage
+		outboxQ[outboxQMessageNumber].hasSent 		= true;
+	}
+
 }
 
 

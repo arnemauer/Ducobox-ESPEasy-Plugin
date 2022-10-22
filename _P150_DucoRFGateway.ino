@@ -6,6 +6,9 @@
 //  Parts of this code is based on the itho-library made by 'supersjimmie', 'Thinkpad', 'Klusjesman' and 'jodur'.
 //#######################################################################################################
 
+// TEST GATEWAY
+//#define TEST_GATEWAY
+
 #include "_Plugin_Helper.h"
 #include <SPI.h>
 #include "DucoCC1101.h"
