@@ -588,8 +588,12 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 					printWebString += log;
 					success = true;
 
+				}else if (cmd.equalsIgnoreCase(F("FREQEST"))){
+
+					uint8_t freqest = PLUGIN_150_rf.TEST_readFreqest();
 					char LogBuf[20];
-					snprintf(LogBuf, sizeof(LogBuf), "rxBYTES: %02X",marcState);
+					snprintf(LogBuf, sizeof(LogBuf), "freqest: %02X",freqest);
+
 					log += LogBuf;
 					addLogMove(LOG_LEVEL_INFO, log);
 					printWebString += log;

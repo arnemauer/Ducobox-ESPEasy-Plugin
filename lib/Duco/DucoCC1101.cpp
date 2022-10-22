@@ -1738,6 +1738,11 @@ void DucoCC1101::TEST_readAllRegisters(){
 	setLogMessage(bigLogBuf);
 }
 
+uint8_t DucoCC1101::TEST_readFreqest(){
+	uint8_t freqest = readRegister(0xF2);
+	return freqest;
+}
+
 void DucoCC1101::sendTestMessage(){
 
 	// get a free spot in OutboxQ
