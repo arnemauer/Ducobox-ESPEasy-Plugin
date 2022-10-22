@@ -579,6 +579,14 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 					success = true;
 
 
+				}else if (cmd.equalsIgnoreCase(F("READREGISTERS"))){
+
+					PLUGIN_150_rf.TEST_readAllRegisters();
+					PLUGIN_150_GetRfLog();
+					log += F("Reading registers of CC1101. See log messages!");
+					addLogMove(LOG_LEVEL_INFO, log);
+					printWebString += log;
+					success = true;
 
 					char LogBuf[20];
 					snprintf(LogBuf, sizeof(LogBuf), "rxBYTES: %02X",marcState);

@@ -1720,6 +1720,24 @@ uint8_t DucoCC1101::TEST_getRxBytes(){
 }
 
 
+
+void DucoCC1101::TEST_readAllRegisters(){
+
+	uint8_t registerBuffer[24];
+  	char bigLogBuf[106]; 
+
+	readBurstRegister(registerBuffer, 0x00, 24);  // 0x00 t/m 0x17 = 24 registers
+	arrayToString(registerBuffer, 24, bigLogBuf);
+	setLogMessage(bigLogBuf);
+
+	memset(registerBuffer, 0, sizeof(registerBuffer)); // reset char bigLogBuf
+	memset(bigLogBuf, 0, sizeof(bigLogBuf)); // reset char bigLogBuf
+
+	readBurstRegister(registerBuffer, 0x18, 23);  // 0x18 t/m 0x2E = 23 registers
+	arrayToString(registerBuffer, 24, bigLogBuf);
+	setLogMessage(bigLogBuf);
+}
+
 void DucoCC1101::sendTestMessage(){
 
 	// get a free spot in OutboxQ
