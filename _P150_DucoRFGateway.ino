@@ -591,6 +591,20 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 					printWebString += log;
 					success = true;
 
+
+				}else if (cmd.equalsIgnoreCase(F("WRITEREGISTER"))){
+
+					String param2 = parseString(tmpString, 3);
+					uint8_t address = atoi(param1.c_str()); // if empty percentage will be 0
+					uint8_t data 	= atoi(param2.c_str()); // if empty percentage will be 0
+
+					PLUGIN_150_rf.TEST_writeRegister(address, data);
+					PLUGIN_150_GetRfLog();
+					log += F("Writing value to register. See log messages!");
+					addLogMove(LOG_LEVEL_INFO, log);
+					printWebString += log;
+					success = true;
+
 				}else if (cmd.equalsIgnoreCase(F("FREQEST"))){
 
 					uint8_t freqest = PLUGIN_150_rf.TEST_readFreqest();

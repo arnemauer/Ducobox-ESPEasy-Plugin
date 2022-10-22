@@ -1637,6 +1637,13 @@ void DucoCC1101::TEST_readAllRegisters(){
 	setLogMessage(bigLogBuf);
 }
 
+
+void DucoCC1101::TEST_writeRegister(uint8_t address, uint8_t data){
+
+	writeRegister(address, data); 
+	setLogMessage(F("Writing value to register done."));
+}
+
 uint8_t DucoCC1101::TEST_readFreqest(){
 	uint8_t freqest = readRegister(0xF2);
 	return freqest;
