@@ -68,19 +68,20 @@ void DucoCC1101::initReceive()
 	/*
 	Configuration reverse engineered from RFT print.
 	
-	Base frequency		868.294312  		(868.294312 FREQ2-0 0x21 0x65 0x5C) / (868.292358 FREQ2-0 0x21 0x65 0x57)
+	Base frequency		868.326447 MHz 		(868.294312 FREQ2-0 0x21 0x65 0x5C) / (868.292358 FREQ2-0 0x21 0x65 0x57)
 	Channel				0
-	Channel spacing		199.951172kHz
-	Carrier frequency	868.294312MHz  		(868.294312 FREQ2-0 0x21 0x65 0x5C) / (868.292358 FREQ2-0 0x21 0x65 0x57)
-	Xtal frequency		26.000000MHz
-	Data rate			38.3835kBaud  
-	RX filter BW		101.562500kHz 
+	Channel spacing		199.951172 kHz
+	Carrier frequency	868.326447 MHz  		(868.294312 FREQ2-0 0x21 0x65 0x5C) / (868.292358 FREQ2-0 0x21 0x65 0x57)
+	Xtal frequency		26.000000 MHz
+	Data rate			38.3835 kBaud  
+	RX filter BW		101.562500 kHz 
 	Manchester			disabled
 	Modulation			GFSK
 	Deviation			20.629883 kHz	
 	TX power			0xC5,0x00,0x00,0x00,0x00,0x00,0x00,0x00
 	PA ramping			disabled
 	Whitening			disabled
+	IF frequency 		(26000 / 2^10 ) * 6 = 152,34375 kHz
 	*/	
 	this->ducoDeviceState = ducoDeviceState_notInitialised;
 	writeCommand(CC1101_SRES);
@@ -103,11 +104,11 @@ void DucoCC1101::initReceive()
 	      =>> TODO: disable interrupt
 	*/
 
-	writeRegister(CC1101_FIFOTHR, 0x47); //  ADC_RETENTION =1; FIFO treshold TX 33 bytes / RX 32 bytes
-	writeRegister(CC1101_SYNC1 ,0xD3);	//duco 0xD3 /   		//message2 byte6
-	writeRegister(CC1101_SYNC0 ,0x91);	//duco 0x91	/  	//message2 byte7
+	writeRegister(CC1101_FIFOTHR, 0x47); //0x47=01000111;  [6]ADC_RETENTION =1; [5:6] CLOSE_IN_RX FIFO=00; [3:0]FIFO_THR=0111 treshold TX 33 bytes / RX 32 bytes (default; not used)
+	writeRegister(CC1101_SYNC1 ,0xD3);	//duco 0xD3 / SYNC1 – Sync Word, High Byte
+	writeRegister(CC1101_SYNC0 ,0x91);	//duco 0x91	/ SYNC0 – Sync Word, Low Byte
 
-	writeRegister(CC1101_PKTLEN ,0x3D); // duco 0x20 / maximum packet size is 32 bytes, The packet length is defined as the 
+	writeRegister(CC1101_PKTLEN ,0x20); // duco 0x20 / PKTLEN – Packet Length: maximum packet length allowed. maximum packet size is 32 bytes, The packet length is defined as the 
 										// payload data, excluding the length byte and the optional CRC.
 
 										// CC1101 Silicon Errata (Rev. E) - https://www.ti.com/lit/er/swrz020e/swrz020e.pdf?ts=1650659256454
@@ -119,26 +120,26 @@ sync word. The packet length is defined as the payload data, excluding the lengt
 used to set the maximum packet length allowed in RX. Any packet received with a length byte with a value greater than PKTLEN will be discarded.*/
 
 
-	writeRegister(CC1101_PKTCTRL1 ,0x0C); //duco 0x0C=00001100 /  	//ADR_CHK[1:0]=No address check, APPEND_STATUS= two status bytes will be appended to the payload of the packet. The status bytes contain RSSI and LQI values, as well as CRC OK.; CRC_AUTOFLUSH = Enable automatic flush of RX FIFO when CRC is not OK.
-	writeRegister(CC1101_PKTCTRL0 ,0x05); //duco 0x05=00000101 /  		//Variable packet length mode. Packet length configured by the first byte after sync word, CRC calculation in TX and CRC check in RX enabled, No data whitening, Normal mode, use FIFOs for RX and TX
+	writeRegister(CC1101_PKTCTRL1 ,0x0C); //0x0C=00001100 / [7:5]PQT; [4]not used; [3]CRC_AUTOFLUSH=1;[2]APPEND_STATUS=1; [1:0]ADR_CHK=00;  	//ADR_CHK[1:0]=No address check, APPEND_STATUS= two status bytes will be appended to the payload of the packet. The status bytes contain RSSI and LQI values, as well as CRC OK.; CRC_AUTOFLUSH = Enable automatic flush of RX FIFO when CRC is not OK.
+	writeRegister(CC1101_PKTCTRL0 ,0x05); //0x05=00000101 / [7]not used; [6]WHITE_DATA=0; [5:4]PKT_FORMAT=00; [3]not used; [2]CRC_EN=1; [1:0]LENGTH_CONFIG=01;  		//Variable packet length mode. Packet length configured by the first byte after sync word, CRC_EN = 1 -> CRC calculation in TX and CRC check in RX enabled, No data whitening, Normal mode, use FIFOs for RX and TX
 	
 	writeRegister(CC1101_ADDR ,0x00); // duco/ NOT USED: Address used for packet filtration. 
 	writeRegister(CC1101_CHANNR ,0x00); // duco/
 
-	writeRegister(CC1101_FSCTRL1 ,0x06); // duco/
+	writeRegister(CC1101_FSCTRL1 ,0x06); // duco/ 0x06 = 00000110; [7:6]
 	writeRegister(CC1101_FSCTRL0 ,0x00); // duco/
 
 	writeRegister(CC1101_FREQ2 ,0x21); // duco/
 	writeRegister(CC1101_FREQ1 ,0x65); // duco/
-	writeRegister(CC1101_FREQ0 ,0x57); // ducobox: 0x5C - freq = 868.294312  //  CO2/humidity sensors: 0x57 - freq=868.292358
+	writeRegister(CC1101_FREQ0 ,0xAD); // 0xAD = 868,326447 mhz, freq. compensation to match with frequency of ducobox; // ducobox: 0x5C - freq = 868.294312  //  CO2/humidity sensors: 0x57 - freq=868.292358
 
-	writeRegister(CC1101_MDMCFG4 ,0xCA); // duco 0xCA   / 0xE8 
+	writeRegister(CC1101_MDMCFG4 ,0xCA); // duco 0xCA =11.00.1010; [7:6]CHANBW_E = 3; CHANBW_M= 0; [3:0]DRATE_E = 10; > Channel Filter Bandwidth: 102Khz   / 0xE8 
 	writeRegister(CC1101_MDMCFG3 ,0x83); // duco 0x83   / 0x43 
 	writeRegister(CC1101_MDMCFG2 ,0x13); // duco 0x13   / 0x00 		//Enable digital DC blocking filter before demodulator, GFSK, Disable Manchester encoding/decoding, No preamble/sync 
-	writeRegister(CC1101_MDMCFG1 ,0x22); // duco/		//Disable FEC (FEC_EN)
+	writeRegister(CC1101_MDMCFG1 ,0x22); // 0x22=0.010.00.10; duco/		//Disable FEC (FEC_EN); 6:4 NUM_PREAMBLE = 4 preamble bytes; 3:2 not used; 1:0 CHANSPC_E=2;
 	writeRegister(CC1101_MDMCFG0 ,0xF8); // duco/ channel spacing = 199.951 kHz
 	
-	writeRegister(CC1101_DEVIATN ,0x35); // duco 0x35   / 0x40 
+	writeRegister(CC1101_DEVIATN ,0x35); // 0x35 = 0.011.0.101 [6:4]DEVIATION_E=3; [3] not used; [2:0] DEVIATION_M = 5 / 0x40 
 
 	writeRegister(CC1101_MCSM2 ,0x07);  
 	writeRegister(CC1101_MCSM1 ,0x2F); //Next state after finishing packet reception/transmission => RX
@@ -167,7 +168,7 @@ used to set the maximum packet length allowed in RX. Any packet received with a 
 	writeRegister(CC1101_TEST1 ,0x35); // duco/
 	writeRegister(CC1101_TEST0 ,0x09); // duco 0x09 / 0x0B
 
-	writeRegister(CC1101_IOCFG0 ,0x07);	//!!! 	//High impedance (3-state)
+	//writeRegister(CC1101_IOCFG0 ,0x07);	//!!! 	//High impedance (3-state)
 
 
 	uint8_t ducoPaTableReceive[8] = {this->radioPower, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
