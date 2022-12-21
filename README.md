@@ -2,7 +2,7 @@
 Plugin voor ESPEasy om een Ducobox Silent / Focus aan te sturen / sensoren uit te lezen. 
 Er zijn twee plugins: een ducobox RF gateway en ducobox serial gateway.
 
-## **Ben je geïnteresseerd in een usb kabel of een complete gateway? <br />Vul dan [dit formulier](https://forms.gle/QiHtNV9kgV45jKJh8) in.**
+## **Ben je geïnteresseerd in een usb kabel of een complete gateway? <br />Je kan hem hier bestellen: [ventilationgateway.com](https://www.ventilationgateway.com)**
 <br />
 <table>
 <tr><td>
