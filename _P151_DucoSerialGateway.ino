@@ -193,7 +193,7 @@ boolean Plugin_151(byte function, struct EventStruct *event, String &string){
 			if(PCONFIG(P151_CONFIG_VALUE_TYPE) == P151_VALUE_VENTMODE){
 
 				addRowLabel(F("Hardware type"));
-				addSelector_Head_reloadOnChange(PCONFIG_LABEL(P151_CONFIG_HARDWARE_TYPE));
+				addSelector_Head_reloadOnChange(PCONFIG_LABEL(P151_CONFIG_HARDWARE_TYPE), F("wide"), false);
 
 				for (byte x = 0; x < P151_HARDWARE_NR_OUTPUT_OPTIONS; x++){
 					addSelector_Item(Plugin_151_hardware_type(x), x, PCONFIG(P151_CONFIG_HARDWARE_TYPE) == x, false, "");
