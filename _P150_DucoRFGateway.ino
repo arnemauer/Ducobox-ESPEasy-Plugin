@@ -480,14 +480,29 @@ boolean Plugin_150(byte function, struct EventStruct *event, String& string)
 
 					uint8_t ventilationMode = 0x99;
 					bool permanentVentilationMode = false;
-					if (param1.equalsIgnoreCase(F("AUTO")))	{ 		  				ventilationMode = 0x00;
-					}else if (param1.equalsIgnoreCase(F("LOW")))	{ 				ventilationMode = 0x04;
-					}else if (param1.equalsIgnoreCase(F("MIDDLE")))	{ 				ventilationMode = 0x05;
-					}else if (param1.equalsIgnoreCase(F("HIGH")))	{ 				ventilationMode = 0x06;					
-					}else if (param1.equalsIgnoreCase(F("NOTHOME"))){ 				ventilationMode = 0x07; 
-					}else if (param1.equalsIgnoreCase(F("PERMANENTLOW")))	{ 		ventilationMode = 0x04; permanentVentilationMode = true;
-					}else if (param1.equalsIgnoreCase(F("PERMANENTMIDDLE")))	{ 	ventilationMode = 0x05; permanentVentilationMode = true;
-					}else if (param1.equalsIgnoreCase(F("PERMANENTHIGH")))	{ 		ventilationMode = 0x06; permanentVentilationMode = true;
+					
+					// Change ventmode by integer or string
+					int param1_int;
+					if (validIntFromString(param1, param1_int)) {
+						if (param1_int == 0) {			ventilationMode = 0x00;
+						}else if (param1_int == 1) {	ventilationMode = 0x04;
+						}else if (param1_int == 2) {	ventilationMode = 0x05;
+						}else if (param1_int == 3) {	ventilationMode = 0x06;
+						}else if (param1_int == 4) {	ventilationMode = 0x07;
+						}else if (param1_int == 11) {	ventilationMode = 0x04; permanentVentilationMode = true;
+						}else if (param1_int == 12) {	ventilationMode = 0x05; permanentVentilationMode = true;
+						}else if (param1_int == 13) {	ventilationMode = 0x06; permanentVentilationMode = true;
+						}
+					} else {
+						if (param1.equalsIgnoreCase(F("AUTO")))	{ 		  				ventilationMode = 0x00;
+						}else if (param1.equalsIgnoreCase(F("LOW")))	{ 				ventilationMode = 0x04;
+						}else if (param1.equalsIgnoreCase(F("MIDDLE")))	{ 				ventilationMode = 0x05;
+						}else if (param1.equalsIgnoreCase(F("HIGH")))	{ 				ventilationMode = 0x06;					
+						}else if (param1.equalsIgnoreCase(F("NOTHOME"))){ 				ventilationMode = 0x07; 
+						}else if (param1.equalsIgnoreCase(F("PERMANENTLOW")))	{ 		ventilationMode = 0x04; permanentVentilationMode = true;
+						}else if (param1.equalsIgnoreCase(F("PERMANENTMIDDLE")))	{ 	ventilationMode = 0x05; permanentVentilationMode = true;
+						}else if (param1.equalsIgnoreCase(F("PERMANENTHIGH")))	{ 		ventilationMode = 0x06; permanentVentilationMode = true;
+						}
 					}
 					
 					if(ventilationMode == 0x99){
