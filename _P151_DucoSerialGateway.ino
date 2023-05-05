@@ -593,7 +593,11 @@ void Plugin_151_processRow(struct EventStruct *event, bool serialLoggingEnabled 
 
 	String log;
 	if(duco_serial_rowCounter == 1){
-		if (DucoSerialCheckCommandInResponse(PLUGIN_LOG_PREFIX_151, "network") ) {
+		if (DucoSerialCheckCommandInResponse(PLUGIN_LOG_PREFIX_151, "network") ) { // gw send command "Network" with capital N, older ducoboxes returns "network" without capital N
+			log = PLUGIN_LOG_PREFIX_151;
+			log += F("Received correct response on network");
+     		addLogMove(LOG_LEVEL_DEBUG, log);
+      	} else if (DucoSerialCheckCommandInResponse(PLUGIN_LOG_PREFIX_151, "Network") ) { // for newer ducobox e.g. Ducobox Energy comfort 325R
 			log = PLUGIN_LOG_PREFIX_151;
 			log += F("Received correct response on network");
      		addLogMove(LOG_LEVEL_DEBUG, log);
